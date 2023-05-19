@@ -52,7 +52,7 @@ class Player:
         self.rebounding = self.assign_stat("rebounding")
         self.endurance = self.assign_stat("endurance")
 
-    def decrease_stats(self):
+    def decrease_stats(self):  # Decreasing Stats based on their Fatigue Level
         self.three_point_shooting -= self.fatigue
         self.mid_range_shooting -= self.fatigue
         self.passing -= self.fatigue
@@ -60,7 +60,7 @@ class Player:
         self.defense -= self.fatigue
         self.speed -= self.fatigue
 
-    def recover_stats(self):
+    def recover_stats(self):  # Stats Recovery when their on the bench
         self.three_point_shooting += self.fatigue
         self.mid_range_shooting += self.fatigue
         self.passing += self.fatigue
@@ -142,12 +142,13 @@ class Player:
         return int(base_stat + weight * base_stat)
 
     @staticmethod
-    def get_random_name():
+    def get_random_name(self):
         try:
             response = requests.get(API_URL)
             response.raise_for_status()
             return response.json()["name"]
         except (requests.RequestException, KeyError):
+            logging.error("Failed to fetch name from API, using a default name.")
             return f"Player_{random.randint(1, 9999)}"  # Fallback to random name
 
     def __str__(self):
@@ -453,15 +454,16 @@ def menu(game):
 
 
 def save_game(game):
-    with open("save_file.pkl", "wb") as f:
-        pickle.dump(game, f)
+    with open("save_file.json", "w") as f:
+        json.dump(game.__dict__, f)
     logging.info("Game saved!")
 
 
 def load_game():
-    if os.path.exists("save_file.pkl"):
-        with open("save_file.pkl", "rb") as f:
-            game = pickle.load(f)
+    if os.path.exists("save_file.json"):
+        with open("save_file.json", "r") as f:
+            game_data = json.load(f)
+        game = Game(game_data["user_team"], game_data["ai_team"])
         logging.info(f"Loaded game: {game.score}")
         game.simulate_game()
     else:
