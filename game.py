@@ -8,6 +8,11 @@ import logging
 logging.basicConfig(level=logging.INFO)
 
 
+QUARTER_TIME = 720
+FATIGUE_LIMIT = 500
+FOUL_LIMIT = 5
+
+
 TEAM_NAMES = [
     "Bulls",
     "Lakers",
@@ -65,23 +70,71 @@ class Player:
 
     def assign_stat(self, stat):
         position_weights = {
-            "PG": {
-                "passing": 0.15,
+            "PG": {  # Point Guard
+                "passing": 0.20,
+                "dribbling": 0.20,
+                "speed": 0.15,
+                "three_point_shooting": 0.15,
+                "mid_range_shooting": 0.10,
+                "stealing": 0.10,
+                "endurance": 0.05,
+                "defense": 0.03,
+                "finishing": 0.01,
+                "blocking": 0.00,
+                "rebounding": 0.01,
+            },
+            "SG": {  # Shooting Guard
+                "passing": 0.10,
                 "dribbling": 0.15,
                 "speed": 0.15,
-                "three_point_shooting": 0.1,
-                "mid_range_shooting": 0.1,
-                "stealing": 0.15,
-                "endurance": 0.1,
+                "three_point_shooting": 0.20,
+                "mid_range_shooting": 0.15,
+                "stealing": 0.10,
+                "endurance": 0.05,
                 "defense": 0.05,
-                "finishing": 0.05,
-                "blocking": 0,
-                "rebounding": 0,
+                "finishing": 0.03,
+                "blocking": 0.01,
+                "rebounding": 0.01,
             },
-            "SG": {...},
-            "SF": {...},
-            "PF": {...},
-            "C": {...},
+            "SF": {  # Small Forward
+                "passing": 0.10,
+                "dribbling": 0.10,
+                "speed": 0.10,
+                "three_point_shooting": 0.15,
+                "mid_range_shooting": 0.15,
+                "stealing": 0.10,
+                "endurance": 0.10,
+                "defense": 0.10,
+                "finishing": 0.05,
+                "blocking": 0.03,
+                "rebounding": 0.02,
+            },
+            "PF": {  # Power Forward
+                "passing": 0.05,
+                "dribbling": 0.05,
+                "speed": 0.08,
+                "three_point_shooting": 0.10,
+                "mid_range_shooting": 0.15,
+                "stealing": 0.05,
+                "endurance": 0.10,
+                "defense": 0.15,
+                "finishing": 0.15,
+                "blocking": 0.10,
+                "rebounding": 0.02,
+            },
+            "C": {  # Center
+                "passing": 0.05,
+                "dribbling": 0.05,
+                "speed": 0.05,
+                "three_point_shooting": 0.05,
+                "mid_range_shooting": 0.10,
+                "stealing": 0.05,
+                "endurance": 0.10,
+                "defense": 0.20,
+                "finishing": 0.20,
+                "blocking": 0.10,
+                "rebounding": 0.05,
+            },
         }
 
         base_stat = random.randint(50, 100)
@@ -141,7 +194,7 @@ class Game:
                 print("Invalid choice. Please try again.")
 
     def simulate_quarter(self):
-        quarter_time = 720  # in seconds, 12 minutes per quarter
+        quarter_time = QUARTER_TIME  # in seconds, 12 minutes per quarter
         while quarter_time > 0:
             # Check if there are enough players in each team
             if len(self.user_team.players) < 5 or len(self.ai_team.players) < 5:
@@ -237,7 +290,7 @@ class Game:
 
             # During the game
             shot_chance = (
-                shot_success / 100 - offensive_player.fatigue / 500
+                shot_success / 100 - offensive_player.fatigue / FATIGUE_LIMIT
             )  # Reduce shot success rate by fatigue
             shot_chance = max(
                 shot_chance, 0.05
