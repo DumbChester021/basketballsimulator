@@ -112,10 +112,7 @@ class Team:
         self.bench_players = self.players[5:]  # Remaining players on the bench
 
     def get_team_avg_stat(self, stat):
-        total = 0
-        for player in self.players:
-            total += getattr(player, stat)
-        return total / len(self.players)
+        return sum(getattr(player, stat) for player in self.players) / len(self.players)
 
     def get_mvp(self):
         return max(self.players, key=lambda player: player.points)
