@@ -1,5 +1,5 @@
 import os
-import pickle
+import json
 import random
 import time
 import requests
@@ -31,7 +31,7 @@ class Player:
     POSITIONS = ["PG", "SG", "SF", "PF", "C"]
 
     def __init__(self, number):
-        self.name = self.get_random_name()
+        self.name = self.get_random_name(self)
         self.number = number
         self.position = random.choice(self.POSITIONS)
         self.points = 0
@@ -319,7 +319,7 @@ class Game:
         for self.quarter in range(1, 5):  # 4 quarters
             # Quarter start
             logging.info(
-                f"\nQuarter {self.quarter} is about to start! Let's see some action!\n"
+                f"\nQuarter {self.quarter} is about to start! Let's see some action!\nCurrent score: {self.score}"
             )
             self.choose_strategy(self.user_team)  # Let the user choose a strategy
             self.simulate_quarter()
@@ -327,7 +327,7 @@ class Game:
 
             # Quarter end
             logging.info(
-                f"That's the end of quarter {self.quarter}. The players are taking a breather."
+                f"That's the end of quarter {self.quarter}. The players are taking a breather.\nThis is the Current score: {self.score}"
             )
             print("\nGame Stats:")
             for team in [self.user_team, self.ai_team]:
@@ -435,7 +435,7 @@ def menu(game):
             logging.info("\nYour Team Roster:")
             for player in game.user_team.players:
                 logging.info(
-                    f"{player.name} ({player.position}) - {player.shooting}/{player.passing}/{player.dribbling}/{player.defense}/{player.speed}"
+                    f"{player.name} ({player.position}) - {player.three_point_shooting}/{player.mid_range_shooting}/{player.finishing}/{player.passing}/{player.dribbling}/{player.defense}/{player.speed}"
                 )
         elif choice == "3":
             # Save the game
