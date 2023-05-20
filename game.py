@@ -3,6 +3,7 @@ import json
 import random
 import time
 import requests
+from statistics import mean
 
 
 
@@ -33,7 +34,29 @@ class League:
 #Todo: Create a Schedule for all the teams, Randomized and add it to the SCHEDULE Golabal Variable
 
     def create_schedule(self):
-        pass
+        # Get the list of teams
+        teams = self.teams
+
+        # Check if the number of teams is even
+        if len(teams) % 2 != 0:
+            # If not, add a dummy team
+            teams.append(None)
+
+        # Create the schedule
+        schedule = []
+        for round in range(len(teams) - 1):
+            for i in range(len(teams) // 2):
+                # Each team plays with every other team once
+                match = (teams[i], teams[len(teams) - 1 - i])
+                schedule.append(match)
+            # Rotate the teams for the next round
+            teams.insert(1, teams.pop())
+
+        # Remove matches involving the dummy team
+        schedule = [match for match in schedule if None not in match]
+
+        return schedule
+
 
 
 class Player:
@@ -183,9 +206,11 @@ class Player:
             response = requests.get(API_URL)
             response.raise_for_status()
             return response.json()["name"]
-        except (requests.RequestException, KeyError):
+        except (requests.RequestException, KeyError) as e:
             logging.error("Failed to fetch name from API, using a default name.")
+            print(f"Error: {e}")
             return f"Player_{random.randint(1, 9999)}"  # Fallback to random name
+
 
     def __str__(self):
         return self.name
@@ -204,7 +229,7 @@ class Team:
 
 
     def get_team_avg_stat(self, stat):
-        return sum(getattr(player, stat) for player in self.players) / len(self.players)
+        return mean(getattr(player, stat) for player in self.players)
 
 """GetMVP :Todo Fix and make the MVP Selection based on Overall Stats not just points, 
 Here's the Weight scoring = 40%, Defense = 40% and 20% overall stats, 
