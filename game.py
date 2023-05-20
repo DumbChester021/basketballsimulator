@@ -31,7 +31,7 @@ class League:
         self.month = 1
         self.day = 1
 
-#Todo: Create a Schedule for all the teams, Randomized and add it to the SCHEDULE Golabal Variable
+#Create a Schedule for all the teams, Randomized and add it to the SCHEDULE Golabal Variable
 
     def create_schedule(self):
         # Get the list of teams
@@ -79,7 +79,6 @@ class Player:
 
         #Start of Accumalted lifetime Stats
         #Todo do Alltime stats for Each player every after a Game/Game Simulation it adds the temporary stats into this then flushes those
-
         self.assign_position_based_stats()
 
     def assign_position_based_stats(self):
@@ -94,7 +93,7 @@ class Player:
         self.stealing = self.assign_stat("stealing")
         self.rebounding = self.assign_stat("rebounding")
         self.endurance = self.assign_stat("endurance")
-        
+
 
     def decrease_stats(self):  # Decreasing Stats based on their Fatigue Level
         self.three_point_shooting -= self.fatigue
@@ -113,26 +112,8 @@ class Player:
         self.speed += self.fatigue
 
 
-"""Todo: make the Fatigue system work outiside Games as Well , 1 is increase and 2 is decrease"""
-    def manage_fatigue(self, m): 
-        if mode = 1 :
-            self.three_point_shooting -= self.fatigue
-            self.mid_range_shooting -= self.fatigue
-            self.finishing -= self.fatigue
-            self.passing -= self.fatigue
-            self.dribbling -= self.fatigue
-            self.defense -= self.fatigue
-            self.speed -= self.fatigue    
-        else:
-            self.three_point_shooting += self.fatigue
-            self.mid_range_shooting += self.fatigue
-            self.finishing += self.fatigue
-            self.passing += self.fatigue
-            self.dribbling += self.fatigue
-            self.defense += self.fatigue
-            self.speed += self.fatigue 
-                 
-""" Todo: Distribute Points Efficiently, Current Distribution is OP and also isnt limited to 100"""
+
+#Todo: Distribute Points Efficiently, Current Distribution is OP and also isnt limited to 100
     def assign_stat(self, stat):
         position_weights = {
             "PG": {  # Point Guard
@@ -237,9 +218,9 @@ class Team:
     def get_team_avg_stat(self, stat):
         return mean(getattr(player, stat) for player in self.players)
 
-"""GetMVP :Todo Fix and make the MVP Selection based on Overall Stats not just points, 
-Here's the Weight scoring = 40%, Defense = 40% and 20% overall stats, 
-so Star Players have a high chance than Regular players to be MVP """
+    """GetMVP :Todo Fix and make the MVP Selection based on Overall Stats not just points, 
+    Here's the Weight scoring = 40%, Defense = 40% and 20% overall stats, 
+    so Star Players have a high chance than Regular players to be MVP """
 
     def get_mvp(self):
         return max(self.players, key=lambda player: player.points + player.rebounds + player.assists)
@@ -257,6 +238,13 @@ class Game:
         self.QUARTER_TIME = 720 #in seconds
         self.possession = ""
 
+    def to_dict(self):
+        return {
+            "team1": self.team1.to_dict(),
+            "team2": self.team2.to_dict(),
+            # Add other attributes as needed
+        }
+
     def choose_strategy(self, team):
         print(f"\nChoose a strategy for the {team.name} team:")
         for i, strategy in enumerate(Team.STRATEGIES, 1):
@@ -270,9 +258,9 @@ class Game:
             except (IndexError, ValueError):
                 print("Invalid choice. Please try again.")
 
-""" Todo Fix Simulate Quarter with new Complex Method taking advantage of all the Player Stats
-    Also make a Flush Temporary Stats
-"""
+    """ Todo Fix Simulate Quarter with new Complex Method taking advantage of all the Player Stats
+        Also make a Flush Temporary Stats
+    """
     def simulate_quarter(self):
         quarter_time = QUARTER_TIME  # in seconds, 12 minutes per quarter
         while quarter_time > 0:
@@ -288,7 +276,7 @@ class Game:
 
 
             #Todo: Decide the Jumpball based on Rebounding and Height Stat + Luck, Stat WEights:70% Luck Weight: 30%
-            if self.possesion = "":
+            if self.possesion == "":
                 random.random() < 
 
             # Modify shot chances based on the team's strategy
@@ -453,22 +441,26 @@ class Game:
         )
 
 
-def main_menu():
-    print("Welcome to the Basketball Simulator!")
-    print("1. Start a new game")
-    print("2. Load a saved game")
-    print("3. Quit")
+def new_game():
+    while True:
+        print("\nChoose a team:")
+        for i, team_name in enumerate(TEAM_NAMES, 1):
+            logging.info(f"{i}. {team_name}")
 
-    choice = input("Enter your choice: ")
-    if choice == "1":
-        new_game()
-    elif choice == "2":
-        load_game()
-    elif choice == "3":
-        quit()
-    else:
-        print("Invalid choice. Please try again.")
-        main_menu()
+        choice = input("Enter choice: ")
+        if choice.isdigit() and 1 <= int(choice) <= len(TEAM_NAMES):
+            if choice == "1":
+                new_game()
+                break
+            elif choice == "2":
+                load_game()
+                break
+            elif choice == "3":
+                quit()
+            else:
+                print("Invalid choice. Please try again.")
+        else:
+            print("Invalid choice. Please try again.")                
 
 
 def new_game():
