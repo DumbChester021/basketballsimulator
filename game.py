@@ -30,12 +30,13 @@ class League:
         self.injuries = False
         self.month = 1
         self.day = 1
+        self.teams = [Team(name) for name in TEAM_NAMES]  # Add this line
 
     # Create a Schedule for all the teams, Randomized and add it to the SCHEDULE Golabal Variable
 
     def create_schedule(self):
         # Get the list of teams
-        teams = self.teams
+        teams = [Team(name) for name in TEAM_NAMES]
 
         # Check if the number of teams is even
         if len(teams) % 2 != 0:
