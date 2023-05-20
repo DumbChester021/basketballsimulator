@@ -51,7 +51,7 @@ class Player:
 
         #Start of Accumalted lifetime Stats
         #Todo do Alltime stats for Each player every after a Game/Game Simulation it adds the temporary stats into this then flushes those
-        
+
         self.assign_position_based_stats()
 
     def assign_position_based_stats(self):
@@ -449,6 +449,7 @@ def new_game():
         logging.info(
             "\nCreating and Generating Team Names, Player Names, Numbers and Stats, PLease wait..\nThis might take a while.."
         )
+        #Todo: Geenrate Names only if there is no player.json or it is empty, otherwise load names from that
         user_team = Team(TEAM_NAMES[int(choice) - 1])
 
         #Todo: Make the AI Team based on The Schedule
