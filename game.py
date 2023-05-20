@@ -18,7 +18,7 @@ TEAM_NAMES = [
 ]
 STANDINGS = {team: {"wins": 0, "losses": 0} for team in TEAM_NAMES}
 API_URL = "https://api.namefake.com/english-united-states/male"
-
+SCHEDULE = {}
 
 class League:
 
@@ -29,7 +29,13 @@ class League:
         self.injuries = False
         self.month = 1
         self.day = 1
-        
+
+#Todo: Create a Schedule for all the teams, Randomized and add it to the SCHEDULE Golabal Variable
+
+    def create_schedule(self):
+        pass
+
+
 class Player:
     POSITIONS = ["PG", "SG", "SF", "PF", "C"]
 
@@ -37,9 +43,15 @@ class Player:
         self.name = self.get_random_name(self)
         self.number = number
         self.position = random.choice(self.POSITIONS)
+        #Start of Flusahble per Game Temporary Stats
         self.points = 0
         self.fatigue = 0
         self.fouls = 0
+        #end of Flushable per Game Temporary Stats
+
+        #Start of Accumalted lifetime Stats
+        #Todo do Alltime stats for Each player every after a Game/Game Simulation it adds the temporary stats into this then flushes those
+        
         self.assign_position_based_stats()
 
     def assign_position_based_stats(self):
@@ -226,6 +238,9 @@ class Game:
             except (IndexError, ValueError):
                 print("Invalid choice. Please try again.")
 
+""" Todo Fix Simulate Quarter with new Complex Method taking advantage of all the Player Stats
+    Also make a Flush Temporary Stats
+"""
     def simulate_quarter(self):
         quarter_time = QUARTER_TIME  # in seconds, 12 minutes per quarter
         while quarter_time > 0:
