@@ -3,14 +3,7 @@ import json
 import random
 import time
 import requests
-import logging
 
-logging.basicConfig(level=logging.INFO)
-
-
-QUARTER_TIME = 720
-FATIGUE_LIMIT = 500
-FOUL_LIMIT = 5
 
 
 TEAM_NAMES = [
@@ -27,6 +20,16 @@ STANDINGS = {team: {"wins": 0, "losses": 0} for team in TEAM_NAMES}
 API_URL = "https://api.namefake.com/english-united-states/male"
 
 
+class League:
+
+    def __init(self):
+        self.starting_year = 2023
+        self.current_year = 2023
+        self.fatigue = False
+        self.injuries = False
+        self.month = 1
+        self.day = 1
+        
 class Player:
     POSITIONS = ["PG", "SG", "SF", "PF", "C"]
 
@@ -68,6 +71,27 @@ class Player:
         self.defense += self.fatigue
         self.speed += self.fatigue
 
+
+"""Todo: make the Fatigue system work outiside Games as Well , 1 is increase and 2 is decrease"""
+    def manage_fatigue(self, m): 
+        if mode = 1 :
+            self.three_point_shooting -= self.fatigue
+            self.mid_range_shooting -= self.fatigue
+            self.finishing -= self.fatigue
+            self.passing -= self.fatigue
+            self.dribbling -= self.fatigue
+            self.defense -= self.fatigue
+            self.speed -= self.fatigue    
+        else:
+            self.three_point_shooting += self.fatigue
+            self.mid_range_shooting += self.fatigue
+            self.finishing += self.fatigue
+            self.passing += self.fatigue
+            self.dribbling += self.fatigue
+            self.defense += self.fatigue
+            self.speed += self.fatigue 
+                 
+""" Todo: Distribute Points Efficiently, Current Distribution is OP and also isnt limited to 100"""
     def assign_stat(self, stat):
         position_weights = {
             "PG": {  # Point Guard
@@ -156,7 +180,7 @@ class Player:
 
 
 class Team:
-    STRATEGIES = ["Offensive", "Defensive", "Balanced"]
+    STRATEGIES = ["Offensive", "Defensive", "Balanced", "Offensive Paint", "Offensive Outside", "Iso: Star", "Iso: Hot Hand"]
 
     def __init__(self, name, strategy="Balanced"):
         self.name = name
@@ -165,21 +189,29 @@ class Team:
         self.active_players = self.players[:5]  # Starting 5
         self.bench_players = self.players[5:]  # Remaining players on the bench
 
+
+
     def get_team_avg_stat(self, stat):
         return sum(getattr(player, stat) for player in self.players) / len(self.players)
 
-    def get_mvp(self):
+"""GetMVP :Todo Fix and make the MVP Selection based on Overall Stats not just points, 
+Here's the Weight scoring = 40%, Defense = 40% and 20% overall stats, 
+so Star Players have a high chance than Regular players to be MVP """
+
+    def get_mvp(self, team_stats): 
         return max(self.players, key=lambda player: player.points)
 
 
 class Game:
-    def __init__(self, user_team, ai_team):
-        self.user_team = user_team
-        self.ai_team = ai_team
-        self.score = {self.user_team.name: 0, self.ai_team.name: 0}
+    def __init__(self, team1, team2, ai_vs_ai=True):
+        self.team1 = team1
+        self.team2 = team2
+        self.score = {self.team1.name: 0, self.team2.name: 0}
         self.quarter = 0
-        self.foul_limit = 5  # Player must sit after reaching this foul limit
-        self.fatigue_limit = 500  # Player must rest after reaching this fatigue limit
+        self.foul_limit = 6  # Player is Fouled out and Cant be Subbed in when this is Reached
+        self.fatigue_limit = 500  # Should be adjusted to a number that makes every Stat 50 probably regardless of its starting value
+        self.QUARTER_TIME = 720 #in seconds
+        self.possession = ""
 
     def choose_strategy(self, team):
         print(f"\nChoose a strategy for the {team.name} team:")
@@ -198,8 +230,8 @@ class Game:
         quarter_time = QUARTER_TIME  # in seconds, 12 minutes per quarter
         while quarter_time > 0:
             # Check if there are enough players in each team
-            if len(self.user_team.players) < 5 or len(self.ai_team.players) < 5:
-                logging.info("Not enough players to continue the game. Game over.")
+            if len(self.team1.players) < 5 or len(self.team2.players) < 5:
+                print("Not enough players to continue the game. Game over.")
                 return
 
             possession_time = random.randint(4, 23)
@@ -207,12 +239,10 @@ class Game:
             if quarter_time < 0:  # no time left in the quarter
                 break
 
-            if random.random() < 0.5:  # 50% chance for each team to attempt
-                offensive_team = self.user_team
-                defensive_team = self.ai_team
-            else:
-                offensive_team = self.ai_team
-                defensive_team = self.user_team
+
+            #Todo: Decide the Jumpball based on Rebounding and Height Stat + Luck, Stat WEights:70% Luck Weight: 30%
+            if self.possesion = "":
+                random.random() < 
 
             # Modify shot chances based on the team's strategy
             if offensive_team.strategy == "Offensive":
@@ -321,7 +351,7 @@ class Game:
             logging.info(
                 f"\nQuarter {self.quarter} is about to start! Let's see some action!\nCurrent score: {self.score}"
             )
-            self.choose_strategy(self.user_team)  # Let the user choose a strategy
+            self.choose_strategy(self.team1)  # Let the user choose a strategy
             self.simulate_quarter()
             # ...
 
@@ -330,7 +360,7 @@ class Game:
                 f"That's the end of quarter {self.quarter}. The players are taking a breather.\nThis is the Current score: {self.score}"
             )
             print("\nGame Stats:")
-            for team in [self.user_team, self.ai_team]:
+            for team in [self.team1, self.team2]:
                 print(f"\n{team.name}:")
                 for player in team.players:
                     print(
@@ -342,7 +372,7 @@ class Game:
         self.print_result()
 
     def substitute_players(self):
-        for team in [self.user_team, self.ai_team]:
+        for team in [self.team1, self.team2]:
             for player in team.active_players:
                 if (
                     player.fouls >= self.foul_limit
@@ -367,20 +397,20 @@ class Game:
         logging.info(
             f"\nWhat a game! The {winner} team takes the victory with a final score of {self.score[winner]} to {self.score[loser]}!"
         )
-        if winner == self.user_team.name:
-            mvp = self.user_team.get_mvp()
+        if winner == self.team1.name:
+            mvp = self.team1.get_mvp()
         else:
-            mvp = self.ai_team.get_mvp()
+            mvp = self.team2.get_mvp()
         logging.info(
             f"MVP of the game: {mvp.name} from {winner} with {mvp.points} points"
         )
 
 
 def main_menu():
-    logging.info("Welcome to the Basketball Simulator!")
-    logging.info("1. Start a new game")
-    logging.info("2. Load a saved game")
-    logging.info("3. Quit")
+    print("Welcome to the Basketball Simulator!")
+    print("1. Start a new game")
+    print("2. Load a saved game")
+    print("3. Quit")
 
     choice = input("Enter your choice: ")
     if choice == "1":
@@ -390,12 +420,12 @@ def main_menu():
     elif choice == "3":
         quit()
     else:
-        logging.info("Invalid choice. Please try again.")
+        print("Invalid choice. Please try again.")
         main_menu()
 
 
 def new_game():
-    logging.info("\nChoose a team:")
+    print("\nChoose a team:")
     for i, team_name in enumerate(TEAM_NAMES, 1):
         logging.info(f"{i}. {team_name}")
 
@@ -405,6 +435,8 @@ def new_game():
             "\nCreating and Generating Team Names, Player Names, Numbers and Stats, PLease wait..\nThis might take a while.."
         )
         user_team = Team(TEAM_NAMES[int(choice) - 1])
+
+        #Todo: Make the AI Team based on The Schedule
         ai_team = Team(
             random.choice(
                 [name for i, name in enumerate(TEAM_NAMES) if i != int(choice) - 1]
@@ -414,49 +446,51 @@ def new_game():
         while menu(game):  # Keep the game running until the user chooses to quit
             game.simulate_game()
     except (IndexError, ValueError):
-        logging.info("Invalid choice. Please try again.")
+        print("Invalid choice. Please try again.")
         new_game()
 
-
+#Todo: Fix and Implement tho Modified Menu
 def menu(game):
     while True:
-        logging.info("\nWhat would you like to do?")
-        logging.info("1. Play Next Game")
-        logging.info("2. Check Roster")
-        logging.info("3. Save")
-        logging.info("4. Save and Exit")
-        logging.info("5. Exit without Saving")
+        print("\nWhat would you like to do?")
+        print("1. Simulate Other Games and Play to the Next Game")
+        print("2. Check Your Team Roster")
+        print("3. Check other Teams") #Todo: Should be able to Show New Choice Menu for All the Other Teams and in there show Stats for Players in the Team Selected
+        print("4. Check League Standings")
+        print("5. Save")
+        print("6. Save and Exit")
+        print("7. Exit without Saving")
 
         choice = input("Enter your choice: ")
         if choice == "1":
             return True
         elif choice == "2":
             # logging.info the user team's roster
-            logging.info("\nYour Team Roster:")
+            print("\nYour Team Roster:")
             for player in game.user_team.players:
                 logging.info(
                     f"{player.name} ({player.position}) - {player.three_point_shooting}/{player.mid_range_shooting}/{player.finishing}/{player.passing}/{player.dribbling}/{player.defense}/{player.speed}"
                 )
-        elif choice == "3":
+        elif choice == "5":
             # Save the game
             save_game(game)
-            logging.info("Game saved!")
-        elif choice == "4":
+            print("Game saved!")
+        elif choice == "6":
             # Save and exit
             save_game(game)
-            logging.info("Game saved!")
+            print("Game saved!")
             return False
-        elif choice == "5":
+        elif choice == "7":
             # Exit without saving
             return False
         else:
-            logging.info("Invalid choice. Please try again.")
+            print("Invalid choice. Please try again.")
 
-
+#Todo Fix Save and Load to JSON format, Save every stat and make it Loadable as Well
 def save_game(game):
     with open("save_file.json", "w") as f:
         json.dump(game.__dict__, f)
-    logging.info("Game saved!")
+    print("Game saved!")
 
 
 def load_game():
@@ -467,12 +501,12 @@ def load_game():
         logging.info(f"Loaded game: {game.score}")
         game.simulate_game()
     else:
-        logging.info("No saved game found.")
+        print("No saved game found.")
         main_menu()
 
 
 def quit():
-    logging.info("Thank you for playing!")
+    print("Thank you for playing!")
     exit()
 
 
