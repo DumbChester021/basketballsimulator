@@ -35,8 +35,8 @@ class League:
     # Create a Schedule for all the teams, Randomized and add it to the SCHEDULE Golabal Variable
 
     def create_schedule(self):
-        # Get the list of teams
-        teams = [Team(name) for name in TEAM_NAMES]
+        # Get the list of team names
+        teams = TEAM_NAMES.copy()
 
         # Check if the number of teams is even
         if len(teams) % 2 != 0:
@@ -62,9 +62,6 @@ class League:
             match_date = start_date + timedelta(days=i * 2)  # Matches every other day
             schedule_with_dates[match_date.strftime("%Y-%m-%d")] = match
         return schedule_with_dates
-
-    def get_schedule(self):
-        return SCHEDULE
 
 
 class Player:
@@ -646,7 +643,7 @@ def menu(game):
         elif choice == "2":
             # logging.info the user team's roster
             print("\nYour Team Roster:")
-            for player in game.user_team.players:
+            for player in game.team1.players:
                 print(
                     f"{player.name} ({player.position}) - {player.three_point_shooting}/{player.mid_range_shooting}/{player.finishing}/{player.passing}/{player.dribbling}/{player.defense}/{player.speed}"
                 )
