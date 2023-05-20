@@ -4,7 +4,7 @@ import random
 import time
 import requests
 from statistics import mean
-
+from datetime import datetime, timedelta
 
 
 TEAM_NAMES = [
@@ -55,7 +55,12 @@ class League:
         # Remove matches involving the dummy team
         schedule = [match for match in schedule if None not in match]
 
-        return schedule
+        schedule_with_dates = {}
+        start_date = datetime.now()
+        for i, match in enumerate(schedule):
+            match_date = start_date + timedelta(days=i*2)  # Matches every other day
+            schedule_with_dates[match_date.strftime("%Y-%m-%d")] = match
+        return schedule_with_dates
 
 
 
@@ -89,6 +94,7 @@ class Player:
         self.stealing = self.assign_stat("stealing")
         self.rebounding = self.assign_stat("rebounding")
         self.endurance = self.assign_stat("endurance")
+        
 
     def decrease_stats(self):  # Decreasing Stats based on their Fatigue Level
         self.three_point_shooting -= self.fatigue
@@ -235,8 +241,9 @@ class Team:
 Here's the Weight scoring = 40%, Defense = 40% and 20% overall stats, 
 so Star Players have a high chance than Regular players to be MVP """
 
-    def get_mvp(self, team_stats): 
-        return max(self.players, key=lambda player: player.points)
+    def get_mvp(self):
+        return max(self.players, key=lambda player: player.points + player.rebounds + player.assists)
+
 
 
 class Game:
