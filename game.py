@@ -62,6 +62,8 @@ class League:
             schedule_with_dates[match_date.strftime("%Y-%m-%d")] = match
         return schedule_with_dates
 
+    def get_schedule(self):
+        return SCHEDULE
 
 
 class Player:
@@ -84,7 +86,6 @@ class Player:
     def assign_position_based_stats(self):
         self.passing = self.assign_stat("passing")
         self.dribbling = self.assign_stat("dribbling")
-        self.defense = self.assign_stat("defense")
         self.speed = self.assign_stat("speed")
         self.three_point_shooting = self.assign_stat("three_point_shooting")
         self.mid_range_shooting = self.assign_stat("mid_range_shooting")
@@ -100,7 +101,6 @@ class Player:
         self.mid_range_shooting -= self.fatigue
         self.passing -= self.fatigue
         self.dribbling -= self.fatigue
-        self.defense -= self.fatigue
         self.speed -= self.fatigue
 
     def recover_stats(self):  # Stats Recovery when their on the bench
@@ -108,7 +108,6 @@ class Player:
         self.mid_range_shooting += self.fatigue
         self.passing += self.fatigue
         self.dribbling += self.fatigue
-        self.defense += self.fatigue
         self.speed += self.fatigue
 
 
@@ -124,7 +123,6 @@ class Player:
                 "mid_range_shooting": 0.10,
                 "stealing": 0.10,
                 "endurance": 0.05,
-                "defense": 0.03,
                 "finishing": 0.01,
                 "blocking": 0.00,
                 "rebounding": 0.01,
@@ -137,7 +135,6 @@ class Player:
                 "mid_range_shooting": 0.15,
                 "stealing": 0.10,
                 "endurance": 0.05,
-                "defense": 0.05,
                 "finishing": 0.03,
                 "blocking": 0.01,
                 "rebounding": 0.01,
@@ -150,7 +147,6 @@ class Player:
                 "mid_range_shooting": 0.15,
                 "stealing": 0.10,
                 "endurance": 0.10,
-                "defense": 0.10,
                 "finishing": 0.05,
                 "blocking": 0.03,
                 "rebounding": 0.02,
@@ -163,7 +159,6 @@ class Player:
                 "mid_range_shooting": 0.15,
                 "stealing": 0.05,
                 "endurance": 0.10,
-                "defense": 0.15,
                 "finishing": 0.15,
                 "blocking": 0.10,
                 "rebounding": 0.02,
@@ -176,7 +171,6 @@ class Player:
                 "mid_range_shooting": 0.10,
                 "stealing": 0.05,
                 "endurance": 0.10,
-                "defense": 0.20,
                 "finishing": 0.20,
                 "blocking": 0.10,
                 "rebounding": 0.05,
@@ -204,7 +198,7 @@ class Player:
 
 
 class Team:
-    STRATEGIES = ["Offensive", "Defensive", "Balanced", "Offensive Paint", "Offensive Outside", "Iso: Star", "Iso: Hot Hand"]
+    STRATEGIES = ["Offensive", "Defensive", "Balanced", "Offensive Paint", "Offensive Outside", "Iso: Star", "Iso: Hot Hand", "Defensive Paint", "Defensive Three"]
 
     def __init__(self, name, strategy="Balanced"):
         self.name = name
@@ -264,10 +258,58 @@ class Game:
     def simulate_quarter(self):
         quarter_time = QUARTER_TIME  # in seconds, 12 minutes per quarter
         while quarter_time > 0:
-            # Check if there are enough players in each team
-            if len(self.team1.players) < 5 or len(self.team2.players) < 5:
-                print("Not enough players to continue the game. Game over.")
-                return
+#STRATEGIES = ["Offensive", "Defensive", "Balanced", "Offensive Paint", "Offensive Outside", "Iso: Star", "Iso: Hot Hand", "Defensive Paint", "Defensive Three"]
+#Get both teams Strategies First
+#get teams First 5
+#Check if Strategy of Offensive Team is ISO: Star, if it is, Chance of Picking the Star PLayer to have the POssesion is 80%
+#Check if Strategy of Offensive Team is ISO: Hot Hand, if it is, Chance of Picking the Highest Point in the First 5 is 80%
+#If this is Start of the Game, 0-0 points, get both of their Centers            
+    #Todo: Decide the Jumpball based on : Stat rebounding:70% Luck random 0-30% for both of them, Then Compare, If they have matching values do a 50/50 instead
+    #Start possesion, Set offensive team to the winner of Jumpball, Check the Strategy of the Offensive team
+#possesion_setup
+#if not start of game pick the Player on the Offensive team to handle the ball it should be 20% normally per player in starting 5, unless strategy is ISO
+#Pick the Defensive player on the Defensive team, It should match the POsition of the OFfensive PLayer, if theres no Similar pos, Randomize
+
+#Offensive Team Setup
+    #If offensive, have a boost of 5% to the Offensive Player's Offense
+    #if defensive no effect since this is offensive
+    #if Balanced, no effect
+    #if offensive paint the Shot Percentages Tendency of finishing is now 70%, midrange is 20% and 3 point is 10%
+    #if offensive Outside the Shot Percentages Tendency of finishing is now 10%, midrange is 10% and 3 point is 80%
+    #if defensive paint or defensive three, do nothing
+#Defensive team Setup
+    #If offensive, defense -5%
+    #if defensive, 5% in defense stats
+    #if Balanced, no effect
+    #if offensive paint, no effect
+    #if offensive Outside, no effect
+    #if defensive paint, defensive boost for defensive player +10 when offensive player is finishing
+    #if defensive three, defensive boost for defensive player +10 when offensive player is threepointer
+#setup
+    #fatigue should lower the players stats by Fatigue / 10
+
+#Pre-Possesion 
+    #randomize 1-5, set pre-possesion time
+    #check for steal, steal chance = 0, compare steal of defensive vs driibling if steal is higher add 1% steal chance per point difference
+    #radomize if it should be stolen depending on the steal chance
+    #if Stolen , set the defensive player as the Offensive player and compare his speed with the player he stole it from, if he is higher, then he would do a Fastbreak for 2 points
+    #add 1 fatigue to the fastbreak guy then return possesion to the one they stole it to
+#possesion
+    #check type of shot depending on the tendencies of the player
+    #check if block, compare offensive stat vs Block, difference would add 1 is to 1 to block chance
+    #randomize if it should be blocked 
+    #randomize if there should be Foul the higher the difference between offensive player and defensive players overall stats, the higher the cance of the foul, but should not exceed 8%
+    #Check if the Shot goes in
+    #if not go to post possesion
+#post-possesion
+    #check the average rebound stats of both teams,
+    #defensive team should have base 70% chance of rebound
+    #offensive team has 30% chance
+    #change that according to the difference in rebounding stat average
+    #Add fatigue to the players, 1 if they are offensive and defensive,
+    #0.2 if they didint touch the ball in offensive
+    #0.3 if they didnt touch the ball in defensive
+
 
             possession_time = random.randint(4, 23)
             quarter_time -= possession_time
@@ -275,7 +317,7 @@ class Game:
                 break
 
 
-            #Todo: Decide the Jumpball based on Rebounding and Height Stat + Luck, Stat WEights:70% Luck Weight: 30%
+            
             if self.possesion == "":
                 random.random() < 
 
@@ -471,17 +513,25 @@ def new_game():
     choice = input("Enter choice: ")
     try:
         logging.info(
-            "\nCreating and Generating Team Names, Player Names, Numbers and Stats, PLease wait..\nThis might take a while.."
+            "\nCreating and Generating Team Names, Player Names, Numbers and Stats, Please wait..\nThis might take a while.."
         )
-        #Todo: Geenrate Names only if there is no player.json or it is empty, otherwise load names from that
         user_team = Team(TEAM_NAMES[int(choice) - 1])
 
-        #Todo: Make the AI Team based on The Schedule
-        ai_team = Team(
-            random.choice(
-                [name for i, name in enumerate(TEAM_NAMES) if i != int(choice) - 1]
-            )
-        )
+        # Get the schedule
+        league = League()
+        schedule = league.create_schedule()
+
+        # Get the next team in the schedule for the user's team
+        next_team_name = None
+        for date, match in schedule.items():
+            if user_team.name in match:
+                next_team_name = match[0] if match[1] == user_team.name else match[1]
+                break
+
+        if next_team_name is None:
+            raise Exception("No next match found in the schedule for the selected team.")
+
+        ai_team = Team(next_team_name)
         game = Game(user_team, ai_team)
         while menu(game):  # Keep the game running until the user chooses to quit
             game.simulate_game()
@@ -489,13 +539,14 @@ def new_game():
         print("Invalid choice. Please try again.")
         new_game()
 
+
 #Todo: Fix and Implement tho Modified Menu
 def menu(game):
     while True:
         print("\nWhat would you like to do?")
         print("1. Simulate Other Games and Play to the Next Game")
         print("2. Check Your Team Roster")
-        print("3. Check other Teams") #Todo: Should be able to Show New Choice Menu for All the Other Teams and in there show Stats for Players in the Team Selected
+        print("3. Check other Teams")
         print("4. Check League Standings")
         print("5. Save")
         print("6. Save and Exit")
@@ -508,6 +559,18 @@ def menu(game):
             # logging.info the user team's roster
             print("\nYour Team Roster:")
             for player in game.user_team.players:
+                logging.info(
+                    f"{player.name} ({player.position}) - {player.three_point_shooting}/{player.mid_range_shooting}/{player.finishing}/{player.passing}/{player.dribbling}/{player.defense}/{player.speed}"
+                )
+        elif choice == "3":
+            # Show stats for players in the selected team
+            print("\nChoose a team:")
+            for i, team_name in enumerate(TEAM_NAMES, 1):
+                print(f"{i}. {team_name}")
+            team_choice = input("Enter choice: ")
+            selected_team = Team(TEAM_NAMES[int(team_choice) - 1])
+            print(f"\n{selected_team.name} Roster:")
+            for player in selected_team.players:
                 logging.info(
                     f"{player.name} ({player.position}) - {player.three_point_shooting}/{player.mid_range_shooting}/{player.finishing}/{player.passing}/{player.dribbling}/{player.defense}/{player.speed}"
                 )
