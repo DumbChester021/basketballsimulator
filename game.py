@@ -68,7 +68,7 @@ class Player:
     POSITIONS = ["PG", "SG", "SF", "PF", "C"]
 
     def __init__(self, number):
-        self.name = self.get_random_name(self)
+        self.name = self.get_random_name()
         self.number = number
         self.position = random.choice(self.POSITIONS)
         # Start of Flusahble per Game Temporary Stats
@@ -81,6 +81,11 @@ class Player:
         # Todo do Alltime stats for Each player every after a Game/Game Simulation it adds the temporary stats into this then flushes those
         self.assign_position_based_stats()
 
+        # Tendencies tendencies
+        self.finish_tendency = random.uniform(0, 1)
+        self.mid_range_tendency = random.uniform(0, 1 - self.finish_tendency)
+        self.three_point_tendency = 1 - self.finish_tendency - self.mid_range_tendency
+
     def assign_position_based_stats(self):
         self.passing = self.assign_stat("passing")
         self.dribbling = self.assign_stat("dribbling")
@@ -92,6 +97,7 @@ class Player:
         self.stealing = self.assign_stat("stealing")
         self.rebounding = self.assign_stat("rebounding")
         self.endurance = self.assign_stat("endurance")
+        self.free_throw_shooting = self.assign_stat("free_throw_shooting")
 
     def decrease_stats(self):  # Decreasing Stats based on their Fatigue Level
         self.three_point_shooting -= self.fatigue
@@ -121,6 +127,7 @@ class Player:
                 "finishing": 0.01,
                 "blocking": 0.00,
                 "rebounding": 0.01,
+                "free_throw_shooting": 0.05,
             },
             "SG": {  # Shooting Guard
                 "passing": 0.10,
@@ -133,6 +140,7 @@ class Player:
                 "finishing": 0.03,
                 "blocking": 0.01,
                 "rebounding": 0.01,
+                "free_throw_shooting": 0.05,
             },
             "SF": {  # Small Forward
                 "passing": 0.10,
@@ -145,6 +153,7 @@ class Player:
                 "finishing": 0.05,
                 "blocking": 0.03,
                 "rebounding": 0.02,
+                "free_throw_shooting": 0.05,
             },
             "PF": {  # Power Forward
                 "passing": 0.05,
@@ -157,6 +166,7 @@ class Player:
                 "finishing": 0.15,
                 "blocking": 0.10,
                 "rebounding": 0.02,
+                "free_throw_shooting": 0.05,
             },
             "C": {  # Center
                 "passing": 0.05,
@@ -169,23 +179,39 @@ class Player:
                 "finishing": 0.20,
                 "blocking": 0.10,
                 "rebounding": 0.05,
+                "free_throw_shooting": 0.05,
             },
         }
 
-        base_stat = random.randint(50, 100)
         weight = position_weights[self.position].get(stat, 0)
-        return int(base_stat + weight * base_stat)
+        bonus = weight * 100
+        base_stat = (100 - bonus) * random.uniform(0.5, 1)
+        return int(base_stat + bonus)
+
+    def get_player_overall(self):
+        return (
+            self.finish_tendency
+            + self.mid_range_tendency
+            + self.three_point_tendency
+            + self.rebounding
+            + self.stealing
+            + self.blocking
+            + self.speed
+            + self.dribbling
+        ) / 8
 
     @staticmethod
-    def get_random_name(self):
-        try:
-            response = requests.get(API_URL)
-            response.raise_for_status()
-            return response.json()["name"]
-        except (requests.RequestException, KeyError) as e:
-            logging.error("Failed to fetch name from API, using a default name.")
-            print(f"Error: {e}")
-            return f"Player_{random.randint(1, 9999)}"  # Fallback to random name
+    def get_random_name():
+        with open("players.json", "r") as file:
+            data = json.load(file)
+            names = data["players"]
+            if not names:
+                return f"Player_{random.randint(1, 9999)}"  # Fallback to random name
+            name = random.choice(names)
+            names.remove(name)
+            with open("players.json", "w") as file:
+                json.dump({"players": names}, file)
+            return name
 
     def __str__(self):
         return self.name
@@ -224,39 +250,27 @@ class Team:
             key=lambda player: player.points + player.rebounds + player.assists,
         )
 
-
-class Game:
-    def __init__(self, team1, team2, ai_vs_ai=True):
-        self.team1 = team1
-        self.team2 = team2
-        self.score = {self.team1.name: 0, self.team2.name: 0}
-        self.quarter = 0
-        self.foul_limit = (
-            6  # Player is Fouled out and Cant be Subbed in when this is Reached
+    def get_star_player(self):
+        return max(
+            self.players,
+            key=lambda player: mean(
+                [
+                    player.passing,
+                    player.dribbling,
+                    player.speed,
+                    player.three_point_shooting,
+                    player.mid_range_shooting,
+                    player.finishing,
+                    player.blocking,
+                    player.stealing,
+                    player.rebounding,
+                    player.endurance,
+                ]
+            ),
         )
-        self.fatigue_limit = 500  # Should be adjusted to a number that makes every Stat 50 probably regardless of its starting value
-        self.QUARTER_TIME = 720  # in seconds
-        self.possession = ""
 
-    def to_dict(self):
-        return {
-            "team1": self.team1.to_dict(),
-            "team2": self.team2.to_dict(),
-            # Add other attributes as needed
-        }
-
-    def choose_strategy(self, team):
-        print(f"\nChoose a strategy for the {team.name} team:")
-        for i, strategy in enumerate(Team.STRATEGIES, 1):
-            print(f"{i}. {strategy}")
-
-        while True:
-            try:
-                choice = int(input("Enter your choice: ")) - 1
-                team.strategy = Team.STRATEGIES[choice]
-                break
-            except (IndexError, ValueError):
-                print("Invalid choice. Please try again.")
+    def get_hot_hand_player(self):
+        return max(self.players, key=lambda player: player.points)
 
     """ Todo Fix Simulate Quarter with new Complex Method taking advantage of all the Player Stats
         Also make a Flush Temporary Stats
@@ -314,18 +328,44 @@ class Game:
     # 0.2 if they didint touch the ball in offensive
     # 0.3 if they didnt touch the ball in defensive
 
-    def simulate_quarter(self):
-        quarter_time = self.QUARTER_TIME
-        while quarter_time > 0:
-            possession_time = random.randint(4, 23)
-            quarter_time -= possession_time
-            if quarter_time < 0:  # no time left in the quarter
-                break
 
-            # TODO: Implement the rest of the simulation logic here
-            # This will involve a lot of conditional logic based on the team's strategy,
-            # the player's stats, and random chance. It will also involve updating the
-            # game state (score, possession, etc.) based on the outcome of each possession.
+class Game:
+    def __init__(self, team1, team2, ai_vs_ai=True):
+        self.team1 = team1
+        self.team2 = team2
+        self.score = {self.team1.name: 0, self.team2.name: 0}
+        self.quarter = 0
+        self.foul_limit = (
+            6  # Player is Fouled out and Cant be Subbed in when this is Reached
+        )
+        self.fatigue_limit = 500  # Should be adjusted to a number that makes every Stat 50 probably regardless of its starting value
+        self.quarter_time = 720  # in seconds
+        self.possession = ""
+
+    def to_dict(self):
+        return {
+            "team1": self.team1.to_dict(),
+            "team2": self.team2.to_dict(),
+            # Add other attributes as needed
+        }
+
+    def choose_strategy(self, team):
+        print(f"\nChoose a strategy for the {team.name} team:")
+        for i, strategy in enumerate(Team.STRATEGIES, 1):
+            print(f"{i}. {strategy}")
+
+        while True:
+            try:
+                choice = int(input("Enter your choice: ")) - 1
+                team.strategy = Team.STRATEGIES[choice]
+                break
+            except (IndexError, ValueError):
+                print("Invalid choice. Please try again.")
+
+    def simulate_quarter(self):
+        while self.quarter_time > 0:
+            if self.quarter_time < 0:  # no time left in the quarter
+                break
 
             # Get both teams Strategies First
             offensive_strategy = self.team1.strategy
@@ -335,179 +375,289 @@ class Game:
             offensive_players = self.team1.active_players[:5]
             defensive_players = self.team2.active_players[:5]
 
-            # Check if Strategy of Offensive Team is ISO: Star, if it is, Chance of Picking the Star PLayer to have the POssesion is 80%
-            if offensive_strategy == "Iso: Star":
-                star_player = (
-                    self.team1.get_star_player()
-                )  # Assuming you have a method to get the star player
-                offensive_player = random.choices(
-                    offensive_players,
-                    weights=[
-                        0.8 if player == star_player else 0.05
-                        for player in offensive_players
-                    ],
-                    k=1,
-                )[0]
-            # Check if Strategy of Offensive Team is ISO: Hot Hand, if it is, Chance of Picking the Highest Point in the First 5 is 80%
-            elif offensive_strategy == "Iso: Hot Hand":
-                hot_hand_player = (
-                    self.team1.get_hot_hand_player()
-                )  # Assuming you have a method to get the hot hand player
-                offensive_player = random.choices(
-                    offensive_players,
-                    weights=[
-                        0.8 if player == hot_hand_player else 0.05
-                        for player in offensive_players
-                    ],
-                    k=1,
-                )[0]
-            else:
-                offensive_player = random.choice(offensive_players)
-
-            # Pick the Defensive player on the Defensive team, It should match the POsition of the OFfensive PLayer, if theres no Similar pos, Randomize
-            matching_defensive_players = [
-                player
-                for player in defensive_players
-                if player.position == offensive_player.position
-            ]
-            defensive_player = (
-                random.choice(matching_defensive_players)
-                if matching_defensive_players
-                else random.choice(defensive_players)
+            # Select offensive player based on strategy
+            offensive_player = self.select_offensive_player(
+                offensive_strategy, offensive_players
+            )
+            # add Tendencies
+            offensive_player = self.modify_tendencies_based_on_strategy(
+                offensive_player, offensive_strategy
             )
 
-            # TODO: Implement the rest of the simulation logic here
-            # This will involve a lot of conditional logic based on the team's strategy,
-            # the player's stats, and random chance. It will also involve updating the
-            # game state (score, possession, etc.) based on the outcome of each possession.
+            # Select defensive player based on offensive player's position
+            defensive_player = self.select_defensive_player(
+                offensive_player, defensive_players
+            )
 
             # Pre-Possesion
             pre_possession_time = random.randint(1, 5)
-            quarter_time -= pre_possession_time
-            if quarter_time < 0:  # no time left in the quarter
+            self.quarter_time -= pre_possession_time
+            if self.quarter_time < 0:  # no time left in the quarter
                 break
 
             # Check for steal
-            steal_chance = (
-                max(0, defensive_player.stealing - offensive_player.dribbling) / 100
-            )
-            if random.random() < steal_chance:
-                print(
-                    f"{defensive_player.name} from {self.team2.name} steals the ball!"
-                )
-                # Swap offensive and defensive teams
-                self.team1, self.team2 = self.team2, self.team1
-                # Swap offensive and defensive players
-                offensive_player, defensive_player = defensive_player, offensive_player
-                # Check for fastbreak
-                if defensive_player.speed > offensive_player.speed:
-                    print(
-                        f"{defensive_player.name} from {self.team2.name} makes a fastbreak for 2 points!"
-                    )
-                    self.score[self.team2.name] += 2
-                    defensive_player.points += 2
-                    defensive_player.fatigue += 1
-                continue  # possession ends, move to the next one
+            self.check_for_steal(offensive_player, defensive_player)
 
             # Possession
             # Check type of shot depending on the tendencies of the player
-            shot_type = random.choices(
-                ["finish", "mid_range", "three_point"],
-                weights=[
-                    offensive_player.finish_tendency,
-                    offensive_player.mid_range_tendency,
-                    offensive_player.three_point_tendency,
-                ],
-                k=1,
-            )[0]
+            shot_type = self.select_shot_type(offensive_player)
 
             # Check for block
-            block_chance = (
-                max(0, defensive_player.blocking - offensive_player.shooting) / 100
+            block_occurred = self.check_for_block(
+                offensive_player, defensive_player, shot_type
             )
-            if random.random() < block_chance:
-                print(
-                    f"{defensive_player.name} from {self.team2.name} blocks the shot!"
+
+            # If the shot wasn't blocked, check if it goes in
+            if not block_occurred:
+                shot_success_chance = self.calculate_shot_success_chance(
+                    offensive_player, shot_type
                 )
-                continue  # possession ends, move to the next one
+                if random.random() < shot_success_chance:
+                    points = 3 if shot_type == "three_point" else 2
+                    print(
+                        f"{offensive_player.name} from {self.team1.name} makes the {shot_type} shot for {points} points!"
+                    )
+                    self.score[self.team1.name] += points
+                    offensive_player.points += points
+                    self.add_fatigue()
+                else:
+                    missed_shot_commentary = [
+                        f"{offensive_player.name} from {self.team1.name} misses the shot! It bounces off the rim.",
+                        f"{offensive_player.name} from {self.team1.name} can't find the mark. The shot goes wide.",
+                        f"{offensive_player.name} from {self.team1.name} takes the shot but it's no good. It falls short.",
+                    ]
+                    print(random.choice(missed_shot_commentary))
 
             # Randomize if there should be a foul
-            foul_chance = min(
-                0.08, abs(defensive_player.overall - offensive_player.overall) / 100
-            )
-            if random.random() < foul_chance:
-                print(f"{defensive_player.name} from {self.team2.name} commits a foul!")
-                defensive_player.fouls += 1
-                if defensive_player.fouls >= self.foul_limit:
-                    print(
-                        f"{defensive_player.name} from {self.team2.name} is fouled out!"
-                    )
-                    self.team2.active_players.remove(defensive_player)
-                    if self.team2.bench_players:
-                        substitute = self.team2.bench_players.pop(0)
-                        self.team2.active_players.append(substitute)
-                        print(
-                            f"{substitute.name} from {self.team2.name} is substituted in!"
-                        )
-                # Check if the free throw goes in
-                if random.random() < offensive_player.free_throw_shooting / 100:
-                    print(
-                        f"{offensive_player.name} from {self.team1.name} makes the free throw!"
-                    )
-                    self.score[self.team1.name] += 1
-                    offensive_player.points += 1
-                continue  # possession ends, move to the next one
-
-            # Check if the shot goes in
-            shot_success_chance = (
-                offensive_player.shooting / 100
-                - offensive_player.fatigue / self.fatigue_limit
-            )
-            if random.random() < shot_success_chance:
-                points = 3 if shot_type == "three_point" else 2
-                print(
-                    f"{offensive_player.name} from {self.team1.name} makes the shot for {points} points!"
-                )
-                self.score[self.team1.name] += points
-                offensive_player.points += points
-            else:
-                print(
-                    f"{offensive_player.name} from {self.team1.name} misses the shot!"
-                )
+            self.check_for_foul(offensive_player, defensive_player, shot_type)
 
             # Post-Possesion
             # Check the average rebound stats of both teams
-            offensive_rebound_avg = sum(
-                player.rebounding for player in self.team1.active_players
-            ) / len(self.team1.active_players)
-            defensive_rebound_avg = sum(
-                player.rebounding for player in self.team2.active_players
-            ) / len(self.team2.active_players)
-
-            # Defensive team should have base 70% chance of rebound
-            # Offensive team has 30% chance
-            rebound_chance = 0.7 + (defensive_rebound_avg - offensive_rebound_avg) / 100
-            if random.random() < rebound_chance:
-                print(f"{self.team2.name} gets the rebound!")
-            else:
-                print(f"{self.team1.name} gets the rebound!")
-                # Swap offensive and defensive teams
-                self.team1, self.team2 = self.team2, self.team1
+            self.check_for_rebound()
 
             # Add fatigue to the players
-            for player in self.team1.active_players + self.team2.active_players:
-                player.fatigue += 1
-                if player.fatigue >= self.fatigue_limit:
+            self.add_fatigue()
+
+    def modify_tendencies_based_on_strategy(self, offensive_player, offensive_strategy):
+        if offensive_strategy == "Offensive":
+            offensive_player.finish_tendency += 0.05
+            offensive_player.mid_range_tendency += 0.05
+            offensive_player.three_point_tendency += 0.05
+        elif offensive_strategy == "Defensive":
+            # No effect on offensive tendencies
+            pass
+        elif offensive_strategy == "Balanced":
+            # No effect on offensive tendencies
+            pass
+        elif offensive_strategy == "Offensive Paint":
+            offensive_player.finish_tendency = 0.70
+            offensive_player.mid_range_tendency = 0.20
+            offensive_player.three_point_tendency = 0.10
+        elif offensive_strategy == "Offensive Outside":
+            offensive_player.finish_tendency = 0.10
+            offensive_player.mid_range_tendency = 0.10
+            offensive_player.three_point_tendency = 0.80
+        elif offensive_strategy == "Defensive Paint":
+            # No effect on offensive tendencies
+            pass
+        elif offensive_strategy == "Defensive Three":
+            # No effect on offensive tendencies
+            pass
+        return offensive_player
+
+    def select_offensive_player(self, offensive_strategy, offensive_players):
+        if offensive_strategy == "Iso: Star":
+            star_player = self.team1.get_star_player()
+            offensive_player = random.choices(
+                offensive_players,
+                weights=[
+                    0.8 if player == star_player else 0.05
+                    for player in offensive_players
+                ],
+                k=1,
+            )[0]
+        elif offensive_strategy == "Iso: Hot Hand":
+            hot_hand_player = self.team1.get_hot_hand_player()
+            offensive_player = random.choices(
+                offensive_players,
+                weights=[
+                    0.8 if player == hot_hand_player else 0.05
+                    for player in offensive_players
+                ],
+                k=1,
+            )[0]
+        else:
+            offensive_player = random.choice(offensive_players)
+        print(f"{offensive_player.name} from {self.team1.name} has the ball!")
+        return offensive_player
+
+    def select_defensive_player(self, offensive_player, defensive_players):
+        matching_defensive_players = [
+            player
+            for player in defensive_players
+            if player.position == offensive_player.position
+        ]
+        defensive_player = (
+            random.choice(matching_defensive_players)
+            if matching_defensive_players
+            else random.choice(defensive_players)
+        )
+        print(f"{defensive_player.name} from {self.team2.name} is defending!")
+        return defensive_player
+
+    def select_shot_type(self, offensive_player):
+        shot_type = random.choices(
+            ["finish", "mid_range", "three_point"],
+            weights=[
+                offensive_player.finish_tendency,
+                offensive_player.mid_range_tendency,
+                offensive_player.three_point_tendency,
+            ],
+            k=1,
+        )[0]
+        if shot_type == "finish":
+            print(f"{offensive_player.name} from {self.team1.name} goes for a layup!")
+        else:
+            print(
+                f"{offensive_player.name} from {self.team1.name} attempts a {shot_type} shot!"
+            )
+        return shot_type
+
+    def check_for_steal(self, offensive_player, defensive_player):
+        steal_chance = (
+            max(0, defensive_player.stealing - offensive_player.dribbling) / 100
+        )
+        if random.random() < steal_chance:
+            print(f"{defensive_player.name} from {self.team2.name} steals the ball!")
+            # Swap offensive and defensive teams
+            self.team1, self.team2 = self.team2, self.team1
+            # Swap offensive and defensive players
+            offensive_player, defensive_player = defensive_player, offensive_player
+            # Check for fastbreak
+            if defensive_player.speed > offensive_player.speed:
+                print(
+                    f"{defensive_player.name} from {self.team2.name} makes a fastbreak for easy 2 points!"
+                )
+                self.score[self.team2.name] += 2
+                defensive_player.points += 2
+                defensive_player.fatigue += 1
+
+    def check_for_block(self, offensive_player, defensive_player, shot_type):
+        if shot_type == "finish":
+            shot_skill = getattr(offensive_player, "finishing")
+        else:
+            shot_skill = getattr(offensive_player, f"{shot_type}_shooting")
+        block_chance = max(0, defensive_player.blocking - shot_skill) / 100
+        if random.random() < block_chance:
+            print(f"{defensive_player.name} from {self.team2.name} blocks the shot!")
+            possession_time = random.randint(12, 23)
+            self.quarter_time -= possession_time
+            return True
+        return False
+
+    def check_for_foul(self, offensive_player, defensive_player, shot_type):
+        # Calculate shot success chance
+        if shot_type == "finish":
+            shot_skill = getattr(offensive_player, "finishing")
+        else:
+            shot_skill = getattr(offensive_player, f"{shot_type}_shooting")
+        shot_success_chance = (
+            shot_skill * offensive_player.endurance / 10000
+        )  # Assuming both stats are out of 100
+
+        foul_chance = min(
+            0.08,
+            abs(
+                defensive_player.get_player_overall()
+                - offensive_player.get_player_overall()
+            )
+            / 100,
+        )
+        if random.random() < foul_chance:
+            print(f"{defensive_player.name} from {self.team2.name} commits a foul!")
+            defensive_player.fouls += 1
+            if defensive_player.fouls >= self.foul_limit:
+                print(f"{defensive_player.name} from {self.team2.name} is fouled out!")
+                self.team2.active_players.remove(defensive_player)
+                if self.team2.bench_players:
+                    substitute = self.team2.bench_players.pop(0)
+                    self.team2.active_players.append(substitute)
                     print(
-                        f"{player.name} from {self.team1.name} is too fatigued and is substituted out!"
+                        f"{substitute.name} from {self.team2.name} is substituted in!"
                     )
-                    self.team1.active_players.remove(player)
-                    if self.team1.bench_players:
-                        substitute = self.team1.bench_players.pop(0)
-                        self.team1.active_players.append(substitute)
-                        print(
-                            f"{substitute.name} from {self.team1.name} is substituted in!"
-                        )
+            # Determine the number of free throw attempts based on the shot type and whether the shot was successful
+            if shot_success_chance > random.random():
+                free_throw_attempts = 1  # If the shot is successful and the player is fouled, there's only 1 free throw attempt
+            else:
+                free_throw_attempts = (
+                    3 if shot_type == "three_point" else 2
+                )  # If the shot is not successful, there are 2 or 3 attempts depending on the shot type
+            # Check if the free throws go in
+            for attempt in range(free_throw_attempts):
+                if random.random() < offensive_player.free_throw_shooting / 100:
+                    print(
+                        f"{offensive_player.name} from {self.team1.name} makes free throw {attempt + 1}!"
+                    )
+                    self.score[self.team1.name] += 1
+                    offensive_player.points += 1
+                else:
+                    print(
+                        f"{offensive_player.name} from {self.team1.name} misses free throw {attempt + 1}!"
+                    )
+
+    def check_for_rebound(self):
+        self.quarter_time -= random.randint(12, 23)
+        offensive_rebound_avg = sum(
+            player.rebounding for player in self.team1.active_players
+        ) / len(self.team1.active_players)
+        defensive_rebound_avg = sum(
+            player.rebounding for player in self.team2.active_players
+        ) / len(self.team2.active_players)
+
+        # Defensive team should have base 70% chance of rebound
+        # Offensive team has 30% chance
+        rebound_chance = 0.7 + (defensive_rebound_avg - offensive_rebound_avg) / 100
+        if random.random() < rebound_chance:
+            rebounder = random.choices(
+                self.team2.active_players,
+                weights=[player.rebounding for player in self.team2.active_players],
+                k=1,
+            )[0]
+            print(f"{rebounder.name} from {self.team2.name} gets the rebound!")
+        else:
+            rebounder = random.choices(
+                self.team1.active_players,
+                weights=[player.rebounding for player in self.team1.active_players],
+                k=1,
+            )[0]
+            print(f"{rebounder.name} from {self.team1.name} gets the rebound!")
+            # Swap offensive and defensive teams
+            self.team1, self.team2 = self.team2, self.team1
+
+    def calculate_shot_success_chance(self, offensive_player, shot_type):
+        if shot_type == "finish":
+            shot_skill = getattr(offensive_player, "finishing")
+        else:
+            shot_skill = getattr(offensive_player, f"{shot_type}_shooting")
+        shot_success_chance = (
+            shot_skill * offensive_player.endurance / 10000
+        )  # Assuming both stats are out of 100
+        return shot_success_chance
+
+    def add_fatigue(self):
+        for player in self.team1.active_players + self.team2.active_players:
+            player.fatigue += 1
+            if player.fatigue >= self.fatigue_limit:
+                print(
+                    f"{player.name} from {self.team1.name} is too fatigued and is substituted out!"
+                )
+                self.team1.active_players.remove(player)
+                if self.team1.bench_players:
+                    substitute = self.team1.bench_players.pop(0)
+                    self.team1.active_players.append(substitute)
+                    print(
+                        f"{substitute.name} from {self.team1.name} is substituted in!"
+                    )
 
     def simulate_game(self):
         for self.quarter in range(1, 5):  # 4 quarters
@@ -517,8 +667,6 @@ class Game:
             )
             self.choose_strategy(self.team1)  # Let the user choose a strategy
             self.simulate_quarter()
-            # ...
-
             # Quarter end
             print(
                 f"That's the end of quarter {self.quarter}. The players are taking a breather.\nThis is the Current score: {self.score}"
@@ -645,7 +793,7 @@ def menu(game):
             print("\nYour Team Roster:")
             for player in game.team1.players:
                 print(
-                    f"{player.name} ({player.position}) - {player.three_point_shooting}/{player.mid_range_shooting}/{player.finishing}/{player.passing}/{player.dribbling}/{player.defense}/{player.speed}"
+                    f"\n={player.name} ({player.position}) :\nOffense:\n3pt:{player.three_point_shooting}\nMidrange:{player.mid_range_shooting}\nFinishing:{player.finishing}\nPassing:{player.passing}\nDribbling:{player.dribbling}\nSpeed:{player.speed}\nRebounding:{player.rebounding}\n\nDefense:\nStealing:{player.stealing}\nBlocking:{player.blocking}"
                 )
         elif choice == "3":
             # Show stats for players in the selected team
@@ -657,7 +805,7 @@ def menu(game):
             print(f"\n{selected_team.name} Roster:")
             for player in selected_team.players:
                 print(
-                    f"{player.name} ({player.position}) - {player.three_point_shooting}/{player.mid_range_shooting}/{player.finishing}/{player.passing}/{player.dribbling}/{player.defense}/{player.speed}"
+                    f"\n={player.name} ({player.position}) :\nOffense:\n3pt:{player.three_point_shooting}\nMidrange:{player.mid_range_shooting}\nFinishing:{player.finishing}\nPassing:{player.passing}\nDribbling:{player.dribbling}\nSpeed:{player.speed}\nRebounding:{player.rebounding}\n\nDefense:\nStealing:{player.stealing}\nBlocking:{player.blocking}"
                 )
         elif choice == "5":
             # Save the game
