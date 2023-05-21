@@ -55,6 +55,6 @@ Distributed under the MIT License. See `LICENSE` for more information.
 
 ## Contact
 
-DumbChester021 - contactus@breakksoft.tech
+DumbChester021 - contactus@breaksoft.tech
 Project Link: https://github.com/DumbChester021/basketballsimulator)
 
