@@ -467,6 +467,8 @@ class Game:
         self.quarter_time = 720  # in seconds
         self.possession = ""
         self.already_jumped = False
+        self.last_ally_handler = None
+        self.ball_handler = None
 
     def game_print(self, text):
         team_color = "\033[94m" if self.possession == "team2" else "\033[91m"
@@ -534,11 +536,15 @@ class Game:
                 if self.possession == "team1"
                 else self.team1.active_players[:5]
             )
-
             # Select offensive player based on strategy
-            offensive_player = self.select_offensive_player(
-                offensive_strategy, offensive_players
-            )
+            if self.last_ally_handler == None:
+                # print(f"DevMode: last_ally_handler is None")
+                offensive_player = self.select_offensive_player(
+                    offensive_strategy, offensive_players
+                )
+            else:
+                # print(f"DevMode: last_ally_handler has a Value loading that")
+                offensive_player = self.ball_handler
             # add Tendencies
             offensive_player = self.modify_tendencies_based_on_strategy(
                 offensive_player, offensive_strategy
@@ -552,54 +558,64 @@ class Game:
             # Pre-Possesion
             pre_possession_time = random.randint(1, 5)
             self.quarter_time -= pre_possession_time
+            pass_the_ball = None
             if self.quarter_time < 0:  # no time left in the quarter
                 break
 
-            # Check for steal
-            fastbreak = self.check_for_steal(offensive_player, defensive_player)
-            if fastbreak:
-                # print(f"DevMode: Scored from Fastbreak")
-                pass
-            elif fastbreak == False:
-                # print(f"DevMode: Normal Havent Scored from Fast break")
-                # Possession
-                # Check type of shot depending on the tendencies of the player
+            # Check if Player will pass the Ball
+            pass_the_ball = self.pass_the_ball_check(offensive_player, defensive_player)
+            if pass_the_ball == False:
+                # Check for steal
+                fastbreak = self.check_for_steal(offensive_player, defensive_player)
+                if fastbreak:
+                    # print(f"DevMode: Scored from Fastbreak")
+                    pass
+                elif fastbreak == False:
+                    # print(f"DevMode: Normal Havent Scored from Fast break")
+                    # Possession
+                    # Check type of shot depending on the tendencies of the player
 
-                shot_type = self.select_shot_type(offensive_player)
+                    shot_type = self.select_shot_type(offensive_player)
 
-                # Check for block
-                block_occurred = self.check_for_block(
-                    offensive_player, defensive_player, shot_type
-                )
-
-                # If the shot wasn't blocked, check if it goes in
-                if not block_occurred:
-                    shot_made = self.shot_computation(offensive_player, shot_type)
-                else:
-                    shot_made = False
-                # Randomize if there should be a foul
-                if shot_made == True:
-                    self.check_for_foul(
-                        offensive_player, defensive_player, shot_type, shot_made
-                    )
-                else:
-                    self.check_for_foul(
-                        offensive_player, defensive_player, shot_type, shot_made
+                    # Check for block
+                    block_occurred = self.check_for_block(
+                        offensive_player, defensive_player, shot_type
                     )
 
-                # Post-Possesion
-                # Rebound if shot misses, if it goes in, Just change Possession
-                if not shot_made:
-                    # print(f"DevMode: Missed Shot")
-                    self.check_for_rebound()
-                elif block_occurred:
-                    self.check_for_rebound()
-                else:
-                    # print(f"DevMode: Made Shot")
-                    self.possession_switch()
-                # Add fatigue to the players
-                self.add_fatigue()
+                    # If the shot wasn't blocked, check if it goes in
+                    if not block_occurred:
+                        shot_made = self.shot_computation(offensive_player, shot_type)
+                    else:
+                        shot_made = False
+                    # Randomize if there should be a foul
+                    if shot_made == True:
+                        self.check_for_foul(
+                            offensive_player, defensive_player, shot_type, shot_made
+                        )
+                        if self.last_ally_handler != None:
+                            self.last_ally_handler.assists += 1
+                            self.game_print(
+                                f"That's an assist to {self.last_ally_handler}"
+                            )
+                    else:
+                        self.check_for_foul(
+                            offensive_player, defensive_player, shot_type, shot_made
+                        )
 
+                    # Post-Possesion
+                    # Rebound if shot misses, if it goes in, Just change Possession
+                    if not shot_made:
+                        # print(f"DevMode: Missed Shot")
+                        self.check_for_rebound()
+                    elif block_occurred:
+                        self.check_for_rebound()
+                    else:
+                        # print(f"DevMode: Made Shot")
+                        self.possession_switch()
+                    # Add fatigue to the players
+                    self.add_fatigue()
+            else:
+                self.quarter_time -= random.randint(3, 7)
         self.prep_for_next_quarter()
 
     def jump_ball(self):
@@ -722,6 +738,62 @@ class Game:
                     f"{offensive_player.name} from {self.team2.name} attempts a {shot_type} shot!"
                 )
         return shot_type
+
+    def pass_the_ball_check(self, offensive_player, defensive_player):
+        # Decide if the player will pass the ball or not (50% passing tendency, 50% random)
+        pass_decision = (
+            random.random() < 0.5 * (offensive_player.passing_tendency / 100) + 0.5
+        )
+
+        if pass_decision:
+            # Roll a 10-sided die
+            roll = random.randint(1, 10)
+
+            # If the roll is 8 or less, the pass is successful
+            if roll <= 8:
+                pass_success = True
+            else:
+                # If the roll is 9 or 10, the success of the pass depends on the player's passing ability and the opponent's stealing ability
+                pass_success_chance = 0.8 * (offensive_player.passing / 100) - 0.2 * (
+                    defensive_player.stealing / 100
+                )
+                pass_success = random.random() < pass_success_chance
+
+            if pass_success:
+                # If the pass is successful, set last_ally_handler to the player who passed the ball
+                self.last_ally_handler = offensive_player
+
+                # Randomly select a new active player (excluding the passer) to be the new ball handler
+                if self.possession == "team1":
+                    potential_receivers = [
+                        player
+                        for player in self.team1.active_players
+                        if player != offensive_player
+                    ]
+                else:
+                    potential_receivers = [
+                        player
+                        for player in self.team2.active_players
+                        if player != offensive_player
+                    ]
+
+                new_ball_handler = random.choice(potential_receivers)
+                self.ball_handler = new_ball_handler
+                self.game_print(
+                    f"{offensive_player.name} passes the ball to {new_ball_handler.name}!"
+                )
+
+                # Increase the player's number of passes
+                return True
+            else:
+                # If the Pass failed
+                self.game_print(
+                    f"{offensive_player.name} pass to nothing!, That's a Turnover."
+                )
+                offensive_player.turnovers += 1
+                self.possession_switch()
+                return True
+        return False
 
     def check_for_steal(self, offensive_player, defensive_player):
         steal_chance = (
@@ -980,6 +1052,8 @@ class Game:
         else:
             self.possession = "team1"
         # print(f"possession Changes!")
+        self.ball_handler = None
+        self.last_ally_handler = None
 
     def get_opposite_team(self):
         return "team1" if self.possession == "team2" else "team2"
