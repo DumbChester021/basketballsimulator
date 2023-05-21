@@ -1,5 +1,5 @@
 # Basketball Simulator
-A Basketball Simulator/GM/Coaching Game
+A Basketball Simulator/GM/Coaching Game. 
 This project is a Basketball game simulator built in Python. It allows users to play through simulated basketball games, with detailed play-by-play commentary and statistical tracking.
 
 ## Features
