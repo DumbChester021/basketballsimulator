@@ -8,72 +8,346 @@ from datetime import datetime, timedelta
 
 
 TEAM_NAMES = [
-    "Bulls",
-    "Lakers",
-    "Heat",
-    "Knicks",
-    "Nets",
-    "Warriors",
-    "Spurs",
-    "Clippers",
+    "Atlanta",
+    "Boston",
+    "Brooklyn",
+    "Charlotte",
+    "Chicago",
+    "Cleveland",
+    "Dallas",
+    "Denver",
+    "Detroit",
+    "Golden State",
+    "Houston",
+    "Indiana",
+    "Las Vegas",
+    "Los Angeles",
+    "Memphis",
+    "Miami",
+    "Milwaukee",
+    "Minnesota",
+    "New Orleans",
+    "New York",
+    "Oklahoma City",
+    "Orlando",
+    "Philadelphia",
+    "Phoenix",
+    "Portland",
+    "Sacramento",
+    "San Antonio",
+    "Toronto",
+    "Utah",
+    "Washington",
 ]
-STANDINGS = {team: {"wins": 0, "losses": 0} for team in TEAM_NAMES}
-API_URL = "https://api.namefake.com/english-united-states/male"
-SCHEDULE = {}
 
 
 class League:
     def __init(self):
+        print(f"League is now Initiated, Setting up..")
         self.starting_year = 2023
         self.current_year = 2023
         self.fatigue = False
         self.injuries = False
         self.month = 1
         self.day = 1
-        self.teams = [Team(name) for name in TEAM_NAMES]  # Add this line
+
+        self.teams
+        self.schedule
+        self.standings = {team: {"wins": 0, "losses": 0} for team in TEAM_NAMES}
 
     # Create a Schedule for all the teams, Randomized and add it to the SCHEDULE Golabal Variable
 
-    def create_schedule(self):
-        # Get the list of team names
-        teams = TEAM_NAMES.copy()
+    def create_teams(self):
+        print(f"Creating teams..")
+        teams = []  # Create an empty list to store the teams
+        for name in TEAM_NAMES:
+            team = Team(name)  # Create a Team instance
+            teams.append(team)  # Append the team to the list
+        for team in teams:
+            print(
+                f"\n\nCreated {team.name} and added it to The leagues' teams.\nPlayers:\n"
+            )
+            print
+            for player in team.players:
+                print(f"{player.name}")
+        return teams  # Return the list of teams
 
-        # Check if the number of teams is even
+    def create_schedule(self):
+        print("Creating Schedules..")
+        teams = self.teams.copy()  # Get the list of teams from the self.teams attribute
+
         if len(teams) % 2 != 0:
-            # If not, add a dummy team
             teams.append(None)
 
-        # Create the schedule
         schedule = []
-        for round in range(len(teams) - 1):
+        for round in range(len(teams) // 2):
             for i in range(len(teams) // 2):
-                # Each team plays with every other team once
                 match = (teams[i], teams[len(teams) - 1 - i])
                 schedule.append(match)
-            # Rotate the teams for the next round
-            teams.insert(1, teams.pop())
+            teams.append(teams.pop(0))
 
-        # Remove matches involving the dummy team
         schedule = [match for match in schedule if None not in match]
 
-        schedule_with_dates = {}
-        start_date = datetime.now()
-        for i, match in enumerate(schedule):
-            match_date = start_date + timedelta(days=i * 2)  # Matches every other day
-            schedule_with_dates[match_date.strftime("%Y-%m-%d")] = match
-        return schedule_with_dates
+        print(f"\n\nSchedule:")
+        for match in schedule:
+            print(f"{match[0].name} vs {match[1].name}")
+
+        return schedule
+
+    def sort_standings_by_wins(standings):
+        """
+        Sorts the standings by wins.
+
+        Args:
+          standings: The dictionary to sort.
+
+        Returns:
+          The sorted dictionary.
+        """
+
+        standings_list = []
+        for team_key, team_value in standings.items():
+            standings_list.append((team_key, team_value["wins"]))
+
+        standings_list.sort(key=lambda x: x[1], reverse=True)
+
+        return standings_list
+
+    def seek_standings(standings, team_name, mode=1):
+        """
+        Seeks a dictionary called "standings" using one of its key names.
+
+        Args:
+          standings: The dictionary to seek.
+          team_name: The name of the team to seek.
+          mode: The mode to print the standings in.
+
+        Returns:
+          The value associated with the team name in the dictionary, if it exists.
+          None, if the team name does not exist in the dictionary.
+        """
+
+        for team_key, team_value in standings.items():
+            if team_key == team_name:
+                if mode == 1:
+                    return team_key, team_value
+                elif mode == 2:
+                    return team_key, team_value["wins"], team_value["losses"]
+                elif mode == 3:
+                    return team_key
+                elif mode == 4:
+                    return team_value["wins"]
+                elif mode == 5:
+                    return team_value["losses"]
+
+        return None
+
+    def update_standings(standings, team_name, wins, losses):
+        """
+        Updates the standings of a team in a dictionary.
+
+        Args:
+          standings: The dictionary to update.
+          team_name: The name of the team to update.
+          wins: The number of wins to add to the team's standings.
+          losses: The number of losses to add to the team's standings.
+
+        Returns:
+          The updated dictionary.
+        """
+
+        for team_key, team_value in standings.items():
+            if team_key == team_name:
+                team_value["wins"] += wins
+                team_value["losses"] += losses
+                break
+
+        return standings
+
+    def standings_add_win(standings, team_name):
+        """
+        Adds a win to the standings of a team.
+
+        Args:
+          standings: The dictionary to update.
+          team_name: The name of the team to update.
+
+        Returns:
+          The updated dictionary.
+        """
+
+        for team_key, team_value in standings.items():
+            if team_key == team_name:
+                team_value["wins"] += 1
+                break
+
+        return standings
+
+    def standings_add_loss(standings, team_name):
+        """
+        Adds a loss to the standings of a team.
+
+        Args:
+          standings: The dictionary to update.
+          team_name: The name of the team to update.
+
+        Returns:
+          The updated dictionary.
+        """
+
+        for team_key, team_value in standings.items():
+            if team_key == team_name:
+                team_value["losses"] += 1
+                break
+
+        return standings
+
+
+class Team:
+    STRATEGIES = [
+        "Offensive",
+        "Defensive",
+        "Balanced",
+        "Offensive Paint",
+        "Offensive Outside",
+        "Iso: Star",
+        "Iso: Hot Hand",
+        "Defensive Paint",
+        "Defensive Three",
+    ]
+
+    def __init__(self, name, strategy="Balanced"):
+        self.name = name
+        self.strategy = random.choice(self.STRATEGIES)
+
+        self.players_copy = []
+
+        # Player Creation
+        self.players = []
+        positions = ["PG", "SG", "SF", "PF", "C"] * 2  # Repeat each position twice
+        for i in range(10):
+            self.players.append(Player(i + 1, positions[i]))
+        for i in range(10, 12):  # The last two players can be of any position
+            self.players.append(Player(i + 1))
+
+        # Sort players by their overall rating
+        self.players.sort(key=lambda player: player.get_player_overall(), reverse=True)
+
+        # Copy the Players to a New array to Create the ACtive Players and Bench players
+        self.players_copy = self.players.copy()
+
+        # Pick the best player for each position as the starting five
+        self.active_players = []
+        for position in ["PG", "SG", "SF", "PF", "C"]:
+            for player in self.players_copy:
+                if player.position == position:
+                    self.active_players.append(player)
+                    self.players_copy.remove(player)
+                    break
+
+        # Remaining players on the bench
+        self.bench_players = self.players_copy
+        # print(f"DevMode:\nInitial active players for {self.name}: {[player.name for player in self.active_players]}")
+
+    def get_team_avg_stat(self, stat):
+        return mean(getattr(player, stat) for player in self.players)
+
+    def get_mvp(self):
+        return max(
+            self.players,
+            key=lambda player: player.points
+            + 2 * (player.rebounds + player.assists + player.steals + player.blocks),
+        )
+
+    def get_star_player(self):
+        return max(
+            self.players,
+            key=lambda player: mean(
+                [
+                    player.three_point_shooting,
+                    player.mid_range_shooting,
+                    player.finishing,
+                    player.free_throw_shooting,
+                    player.rebounding,
+                    player.passing,
+                    player.speed,
+                    player.dribbling,
+                    player.stealing,
+                    player.blocking,
+                    player.endurance,
+                ]
+            ),
+        )
+
+    def get_hot_hand_player(self):
+        return max(self.players, key=lambda player: player.points)
+
+    def get_average_stats(self):
+        total_stats = {
+            "three_point_shooting": 0,
+            "mid_range_shooting": 0,
+            "finishing": 0,
+            "free_throw_shooting": 0,
+            "rebounding": 0,
+            "passing": 0,
+            "speed": 0,
+            "dribbling": 0,
+            "stealing": 0,
+            "blocking": 0,
+            "endurance": 0,
+        }
+
+        for player in self.players:
+            total_stats["three_point_shooting"] += player.three_point_shooting
+            total_stats["mid_range_shooting"] += player.mid_range_shooting
+            total_stats["finishing"] += player.finishing
+            total_stats["free_throw_shooting"] += player.free_throw_shooting
+            total_stats["rebounding"] += player.rebounding
+            total_stats["passing"] += player.passing
+            total_stats["speed"] += player.speed
+            total_stats["dribbling"] += player.dribbling
+            total_stats["stealing"] += player.stealing
+            total_stats["blocking"] += player.blocking
+            total_stats["endurance"] += player.endurance
+
+        average_stats = {
+            stat: total / len(self.players) for stat, total in total_stats.items()
+        }
+        return average_stats
+
+    def get_team_overall(self):
+        total_stats = 0
+        stat_count = 0
+
+        for player in self.players:
+            total_stats += player.three_point_shooting
+            total_stats += player.mid_range_shooting
+            total_stats += player.finishing
+            total_stats += player.free_throw_shooting
+            total_stats += player.rebounding
+            total_stats += player.passing
+            total_stats += player.speed
+            total_stats += player.dribbling
+            total_stats += player.stealing
+            total_stats += player.blocking
+            total_stats += player.endurance
+            stat_count += 10  # We added 10 stats for each player
+
+        average_stats = round(total_stats / stat_count)
+        return average_stats
 
 
 class Player:
     POSITIONS = ["PG", "SG", "SF", "PF", "C"]
 
-    def __init__(self, number):
+    def __init__(self, number, position=None):
         self.name = self.get_random_name()
         self.number = number
-        self.position = random.choice(self.POSITIONS)
+        self.position = position if position else random.choice(self.POSITIONS)
 
         self.games_played = 0
         self.minutes_played = 0
+
         # Start of Flusahble per Game Temporary Stats
 
         self.points = 0
@@ -314,6 +588,7 @@ class Player:
         # Increment all time stats
         for stat in self.all_time_stats.keys():
             self.all_time_stats[stat] += getattr(self, stat)
+        # print(f"DevMode: Flushed Stats")
 
         # Reset per-game stats
         self.points = 0
@@ -342,120 +617,8 @@ class Player:
         return self.name
 
 
-class Team:
-    STRATEGIES = [
-        "Offensive",
-        "Defensive",
-        "Balanced",
-        "Offensive Paint",
-        "Offensive Outside",
-        "Iso: Star",
-        "Iso: Hot Hand",
-        "Defensive Paint",
-        "Defensive Three",
-    ]
-
-    def __init__(self, name, strategy="Balanced"):
-        self.name = name
-        self.strategy = strategy
-        self.players = [Player(i) for i in range(1, 16)]  # 15 players
-        self.active_players = self.players[:5]  # Starting 5
-        self.bench_players = self.players[5:]  # Remaining players on the bench
-
-    def get_team_avg_stat(self, stat):
-        return mean(getattr(player, stat) for player in self.players)
-
-    """GetMVP :Todo Fix and make the MVP Selection based on Overall Stats not just points, 
-    Here's the Weight scoring = 40%, Defense = 40% and 20% overall stats, 
-    so Star Players have a high chance than Regular players to be MVP """
-
-    def get_mvp(self):
-        return max(
-            self.players,
-            key=lambda player: player.points + player.rebounds + player.assists,
-        )
-
-    def get_star_player(self):
-        return max(
-            self.players,
-            key=lambda player: mean(
-                [
-                    player.passing,
-                    player.dribbling,
-                    player.speed,
-                    player.three_point_shooting,
-                    player.mid_range_shooting,
-                    player.finishing,
-                    player.blocking,
-                    player.stealing,
-                    player.rebounding,
-                    player.endurance,
-                ]
-            ),
-        )
-
-    def get_hot_hand_player(self):
-        return max(self.players, key=lambda player: player.points)
-
-    """ Todo Fix Simulate Quarter with new Complex Method taking advantage of all the Player Stats
-        Also make a Flush Temporary Stats
-    """
-
-    # STRATEGIES = ["Offensive", "Defensive", "Balanced", "Offensive Paint", "Offensive Outside", "Iso: Star", "Iso: Hot Hand", "Defensive Paint", "Defensive Three"]
-    # Get both teams Strategies First
-    # get teams First 5
-    # Check if Strategy of Offensive Team is ISO: Star, if it is, Chance of Picking the Star PLayer to have the POssesion is 80%
-    # Check if Strategy of Offensive Team is ISO: Hot Hand, if it is, Chance of Picking the Highest Point in the First 5 is 80%
-    # If this is Start of the Game, 0-0 points, get both of their Centers
-    # Todo: Decide the Jumpball based on : Stat rebounding:70% Luck random 0-30% for both of them, Then Compare, If they have matching values do a 50/50 instead
-    # Start possesion, Set offensive team to the winner of Jumpball, Check the Strategy of the Offensive team
-    # possesion_setup
-    # if not start of game pick the Player on the Offensive team to handle the ball it should be 20% normally per player in starting 5, unless strategy is ISO
-    # Pick the Defensive player on the Defensive team, It should match the POsition of the OFfensive PLayer, if theres no Similar pos, Randomize
-
-    # Offensive Team Setup
-    # If offensive, have a boost of 5% to the Offensive Player's Offense
-    # if defensive no effect since this is offensive
-    # if Balanced, no effect
-    # if offensive paint the Shot Percentages Tendency of finishing is now 70%, midrange is 20% and 3 point is 10%
-    # if offensive Outside the Shot Percentages Tendency of finishing is now 10%, midrange is 10% and 3 point is 80%
-    # if defensive paint or defensive three, do nothing
-    # Defensive team Setup
-    # If offensive, defense -5%
-    # if defensive, 5% in defense stats
-    # if Balanced, no effect
-    # if offensive paint, no effect
-    # if offensive Outside, no effect
-    # if defensive paint, defensive boost for defensive player +10 when offensive player is finishing
-    # if defensive three, defensive boost for defensive player +10 when offensive player is threepointer
-    # setup
-    # fatigue should lower the players stats by Fatigue / 10
-
-    # Pre-Possesion
-    # randomize 1-5, set pre-possesion time
-    # check for steal, steal chance = 0, compare steal of defensive vs driibling if steal is higher add 1% steal chance per point difference
-    # radomize if it should be stolen depending on the steal chance
-    # if Stolen , set the defensive player as the Offensive player and compare his speed with the player he stole it from, if he is higher, then he would do a Fastbreak for 2 points
-    # add 1 fatigue to the fastbreak guy then return possesion to the one they stole it to
-    # possesion
-    # check type of shot depending on the tendencies of the player
-    # check if block, compare offensive stat vs Block, difference would add 1 is to 1 to block chance
-    # randomize if it should be blocked
-    # randomize if there should be Foul the higher the difference between offensive player and defensive players overall stats, the higher the cance of the foul, but should not exceed 8%
-    # Check if the Shot goes in
-    # if not go to post possesion
-    # post-possesion
-    # check the average rebound stats of both teams,
-    # defensive team should have base 70% chance of rebound
-    # offensive team has 30% chance
-    # change that according to the difference in rebounding stat average
-    # Add fatigue to the players, 1 if they are offensive and defensive,
-    # 0.2 if they didint touch the ball in offensive
-    # 0.3 if they didnt touch the ball in defensive
-
-
 class Game:
-    def __init__(self, team1, team2, ai_vs_ai=True):
+    def __init__(self, team1, team2, ai_vs_ai=False):
         self.team1 = team1
         self.team2 = team2
         self.score = {self.team1.name: 0, self.team2.name: 0}
@@ -496,6 +659,10 @@ class Game:
                 print("Invalid choice. Please try again.")
 
     def simulate_quarter(self):
+        print(f"Team1 Active players")
+        for player in self.team1.players:
+            print(f"\nPlayer: {player}")
+
         while self.quarter_time > 0:
             if self.quarter_time < 0:  # no time left in the quarter
                 break
@@ -526,15 +693,17 @@ class Game:
                 self.jump_ball()
 
             # Get teams First 5
-            offensive_players = (
-                self.team1.active_players[:5]
-                if self.possession == "team1"
-                else self.team2.active_players[:5]
-            )
+            if self.possession == "team1":
+                offensive_players = self.team1.active_players
+            elif self.possession == "team2":
+                offensive_players = self.team2.active_players
+            else:
+                print(f"DevMode: Possession Invalid : {possession}")
+
             defensive_players = (
-                self.team2.active_players[:5]
+                self.team2.active_players
                 if self.possession == "team1"
-                else self.team1.active_players[:5]
+                else self.team1.active_players
             )
             # Select offensive player based on strategy
             if self.last_ally_handler == None:
@@ -1054,6 +1223,12 @@ class Game:
         # print(f"possession Changes!")
         self.ball_handler = None
         self.last_ally_handler = None
+        """print(
+            f"DevMode:\nActive players for team1: {[player.name for player in self.team1.active_players]}"
+        )
+        print(
+            f"DevMode:\nActive players for team2: {[player.name for player in self.team2.active_players]}"
+        )"""
 
     def get_opposite_team(self):
         return "team1" if self.possession == "team2" else "team2"
@@ -1106,6 +1281,9 @@ class Game:
                     player.three_point_percentage = three_point_percentage
 
     def simulate_game(self):
+        print(
+            f"Match for today : {self.team1.name}, Ovr: {self.team1.get_team_overall()} v.s {self.team2.name} {self.team2.get_team_overall()}\n{self.team1.name}'s star player: {self.team1.get_star_player().name} = Ovr: {self.team1.get_star_player().get_player_overall()}\n{self.team2.name}'s star player: {self.team2.get_star_player().name} = Ovr: {self.team2.get_star_player().get_player_overall()}\n"
+        )
         for self.quarter in range(1, 5):  # 4 quarters
             # Quarter start
             print(
@@ -1140,7 +1318,6 @@ class Game:
             time.sleep(1)  # pause for a second between quarters
 
         self.print_result()
-        self.flush_stats()
 
     def substitute_players(self):
         for team in [self.team1, self.team2]:
@@ -1187,6 +1364,7 @@ class Game:
             f"Steals: {player.steals}\n"
             f"Blocks: {player.blocks}\n\n"
         )
+        self.flush_stats()
 
     def flush_stats(self):
         for player in self.team1.active_players:
@@ -1199,13 +1377,17 @@ class Game:
             player.flush_stats()
         self.score = {self.team1.name: 0, self.team2.name: 0}
 
+    def post_game(self):
+        pass
+
 
 def main_menu():
     while True:
         print("Welcome to the Basketball Simulator!")
         print("1. Start a new game")
         print("2. Load a saved game")
-        print("3. Quit")
+        print("3. Settings")
+        print("4. Quit")
 
         choice = input("Enter your choice: ")
         if choice == "1":
@@ -1214,67 +1396,80 @@ def main_menu():
         elif choice == "2":
             load_game()
             break
-        elif choice == "3":
+        elif choice == "4":
             quit()
         else:
             print("Invalid choice. Please try again.")
 
 
+def settings():
+    pass
+
+
 def new_game():
     print("\nChoose a team:")
+    # Enumerate Teams and Print them
     for i, team_name in enumerate(TEAM_NAMES, 1):
         print(f"{i}. {team_name}")
 
     choice = input("Enter choice: ")
     try:
+        # after you chose,
         print(
             "\nCreating and Generating Team Names, Player Names, Numbers and Stats, Please wait..\nThis might take a while.."
         )
-        user_team = Team(TEAM_NAMES[int(choice) - 1])
+        # Assigning your Team
 
-        # Get the schedule
+        user_team = TEAM_NAMES[int(choice) - 1]
+        print(f"\n\nYou picked the {user_team}\n\n")
+
+        # Initialize the League Class
         league = League()
-        schedule = league.create_schedule()
+        league.teams = league.create_teams()
+        league.schedule = league.create_schedule()
 
-        # Get the next team in the schedule for the user's team
-        next_team_name = None
-        for date, match in schedule.items():
-            if user_team.name in match:
-                next_team_name = match[0] if match[1] == user_team.name else match[1]
+        # Find the match in the schedule with the user's team
+        user_match = None
+        for match in league.schedule:
+            if user_team in [match[0].name, match[1].name]:
+                user_match = match
                 break
 
-        if next_team_name is None:
-            raise Exception(
-                "No next match found in the schedule for the selected team."
-            )
+        # Remove the match from the schedule
+        league.schedule.remove(user_match)
 
-        ai_team = Team(next_team_name)
-        game = Game(user_team, ai_team)
-        while menu(game):  # Keep the game running until the user chooses to quit
+        # Use the user's match to initialize the Game
+        game = Game(user_match[0], user_match[1])
+
+        while menu(
+            game, user_team
+        ):  # Keep the game running until the user chooses to quit
             game.simulate_game()
     except (IndexError, ValueError):
         print("Invalid choice. Please try again.")
         new_game()
 
 
-# Todo: Fix and Implement tho Modified Menu
-def menu(game):
+def menu(game, user_team):
     while True:
         print("\nWhat would you like to do?")
-        print("1. Simulate Other Games and Play to the Next Game")
-        print("2. Check Your Team Roster")
-        print("3. Check other Teams")
-        print("4. Check League Standings")
-        print("5. Save")
-        print("6. Save and Exit")
-        print("7. Exit without Saving")
+        print(
+            f"1. Simulate Other Games and Play to the Next Game ({user_team})"
+            f"\n2. Check Your Team Roster ({user_team})"
+            f"\n3. Check other Teams"
+            f"\n4. Check League Standings"
+            f"\n5. Save"
+            f"\n6. Save and Exit"
+            f"\n7. Exit without Saving"
+        )
 
         choice = input("Enter your choice: ")
         if choice == "1":
             return True
+
         elif choice == "2":
             # logging.info the user team's roster
-            print("\nYour Team Roster:")
+            print(f"\nYour Team Roster:\n{game.team1.name}")
             for player in game.team1.players:
                 print(
                     f"\n========\n{player.name} ({player.position}) :\n"
