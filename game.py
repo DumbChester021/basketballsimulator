@@ -107,24 +107,21 @@ class League:
 
         return schedule
 
-    def sort_standings_by_wins(self, standings):
+    def sort_standings_by_wins(self):
         """
-        Sorts the standings by wins.
+        Sorts the standings by number of wins, in descending order.
 
         Args:
-          standings: The dictionary to sort.
+          self: The league object.
 
         Returns:
-          The sorted dictionary.
+          standings: A dictionary of the standings sorted by wins, in descending order.
+
         """
-
-        standings_list = []
-        for team_key, team_value in standings.items():
-            standings_list.append((team_key, team_value["wins"]))
-
-        standings_list.sort(key=lambda x: x[1], reverse=True)
-
-        return standings_list
+        standings = sorted(
+            self.standings.items(), key=lambda x: x[1]["wins"], reverse=True
+        )
+        return dict(standings)
 
     def seek_standings(self, standings, team_name, mode=1):
         """
@@ -177,17 +174,18 @@ class League:
 
         return standings
 
-    def standings_add_win(self, standings, team_name):
+    def standings_add_win(self, team_name):
         """
         Adds a win to the standings of a team.
 
         Args:
-          standings: The dictionary to update.
           team_name: The name of the team to update.
 
         Returns:
           The updated dictionary.
         """
+
+        standings = league.standings
 
         for team_key, team_value in standings.items():
             if team_key == team_name:
@@ -196,17 +194,17 @@ class League:
 
         return standings
 
-    def standings_add_loss(self, standings, team_name):
+    def standings_add_loss(self, team_name):
         """
         Adds a loss to the standings of a team.
 
         Args:
-          standings: The dictionary to update.
           team_name: The name of the team to update.
 
         Returns:
           The updated dictionary.
         """
+        standings = league.standings
 
         for team_key, team_value in standings.items():
             if team_key == team_name:
@@ -232,8 +230,7 @@ class League:
         team_color = "\033[94m"
         reset_color = "\033[0m"
 
-        standings = self.standings.copy()
-        self.sort_standings_by_wins(standings)
+        standings = self.sort_standings_by_wins()
 
         print(f"\n\nLeague Standings:\n")
 
@@ -669,6 +666,7 @@ class Player:
 
 class Game:
     def __init__(self, team1, team2, ai_vs_ai=False):
+        self.ai_vs_ai = ai_vs_ai
         self.team1 = team1
         self.team2 = team2
         self.score = {self.team1.name: 0, self.team2.name: 0}
@@ -683,10 +681,9 @@ class Game:
         self.last_ally_handler = None
         self.ball_handler = None
 
-    def quick_simulate(self):
-        pass
-
     def game_print(self, text):
+        if self.ai_vs_ai == True:
+            return
         team_color = "\033[94m" if self.possession == "team2" else "\033[91m"
         reset_color = "\033[0m"
         print(f"{team_color}{text}{reset_color}")
@@ -712,9 +709,10 @@ class Game:
                 print("Invalid choice. Please try again.")
 
     def simulate_quarter(self):
-        print(f"Team1 Active players")
-        for player in self.team1.players:
-            print(f"\nPlayer: {player}")
+        if self.ai_vs_ai == False:
+            print(f"Team1 Active players")
+            for player in self.team1.players:
+                print(f"\nPlayer: {player}")
 
         while self.quarter_time > 0:
             if self.quarter_time < 0:  # no time left in the quarter
@@ -725,10 +723,10 @@ class Game:
             quarter_time_seconds = (
                 self.quarter_time % 60
             )  # Remainder gives the remaining seconds
-
-            print(
-                f"Remaining Time on the Clock : {quarter_time_minutes:02d}:{quarter_time_seconds:02d}"
-            )
+            if self.ai_vs_ai == False:
+                print(
+                    f"Remaining Time on the Clock : {quarter_time_minutes:02d}:{quarter_time_seconds:02d}"
+                )
             self.calculate_percentages()
             # Get both teams Strategies First
             offensive_strategy = (
@@ -1039,7 +1037,8 @@ class Game:
                     self.score[self.team2.name] += 2
                     defensive_player.points += 2
                     defensive_player.fatigue += 1
-                    self.show_score()
+                    if self.ai_vs_ai == False:
+                        self.show_score()
                     self.possession_switch()
                     return True
             else:
@@ -1254,7 +1253,8 @@ class Game:
                 f"{offensive_player.name} from {offensive_team.name} makes the {shot_type} shot for {points} points!"
             )
             offensive_player.fatigue += 3
-            self.show_score()
+            if self.ai_vs_ai == False:
+                self.show_score()
 
             return True
         else:  # If the shot was not successful, print a random commentary about the missed shot
@@ -1374,6 +1374,25 @@ class Game:
         self.post_game()
         self.flush_stats()
 
+    def quick_simulate(self):
+        print(
+            f"Simulating : {self.team1.name}, Ovr: {self.team1.get_team_overall()} v.s {self.team2.name} {self.team2.get_team_overall()}\n{self.team1.name}'s star player: {self.team1.get_star_player().name} = Ovr: {self.team1.get_star_player().get_player_overall()}\n{self.team2.name}'s star player: {self.team2.get_star_player().name} = Ovr: {self.team2.get_star_player().get_player_overall()}\n"
+        )
+        for self.quarter in range(1, 5):  # 4 quarters
+            # Quarter start
+            print(f"\nSimulating Quarter {self.quarter}.")
+            self.simulate_quarter()
+
+            # Quarter end
+            print(f"End of quarter {self.quarter}.\n")
+            self.show_score()
+
+        time.sleep(1)  # pause for a second between quarters
+
+        self.print_result()
+        self.post_game()
+        self.flush_stats()
+
     def substitute_players(self):
         for team in [self.team1, self.team2]:
             for player in team.active_players:
@@ -1397,28 +1416,33 @@ class Game:
         loser = min(self.score, key=self.score.get)
 
         # Game end
-        print(
-            f"\nWhat a game! The {winner} team takes the victory with a final score of {self.score[winner]} to {self.score[loser]}!"
-        )
-        if winner == self.team1.name:
-            mvp = self.team1.get_mvp()
+        if self.ai_vs_ai == False:
+            print(
+                f"\nWhat a game! The {winner} team takes the victory with a final score of {self.score[winner]} to {self.score[loser]}!"
+            )
+            if winner == self.team1.name:
+                mvp = self.team1.get_mvp()
+            else:
+                mvp = self.team2.get_mvp()
+            player = mvp
+            print(
+                f"MVP of the game:{player.name} {player.position}\n"
+                f"Points: {player.points}\n"
+                f"Fouls: {player.fouls}\n"
+                f"Fatigue: {player.fatigue}\n"
+                f"FG: {player.field_goals_made}/{player.field_goals_attempted} - {player.field_goal_percentage}%\n"
+                f"Three Point FG: {player.three_points_made}/{player.three_points_attempted} - {player.three_point_percentage}%\n"
+                f"Free Throw FG: {player.free_throws_made}/{player.free_throws_attempted} - {player.free_throw_percentage}%\n"
+                f"Rebounds (O/D - Total): {player.offensive_rebounds}/{player.defensive_rebounds} - {player.rebounds}\n"
+                f"Assists: {player.assists}\n"
+                f"Turnovers: {player.turnovers}\n"
+                f"Steals: {player.steals}\n"
+                f"Blocks: {player.blocks}\n\n"
+            )
         else:
-            mvp = self.team2.get_mvp()
-        player = mvp
-        print(
-            f"MVP of the game:{player.name} {player.position}\n"
-            f"Points: {player.points}\n"
-            f"Fouls: {player.fouls}\n"
-            f"Fatigue: {player.fatigue}\n"
-            f"FG: {player.field_goals_made}/{player.field_goals_attempted} - {player.field_goal_percentage}%\n"
-            f"Three Point FG: {player.three_points_made}/{player.three_points_attempted} - {player.three_point_percentage}%\n"
-            f"Free Throw FG: {player.free_throws_made}/{player.free_throws_attempted} - {player.free_throw_percentage}%\n"
-            f"Rebounds (O/D - Total): {player.offensive_rebounds}/{player.defensive_rebounds} - {player.rebounds}\n"
-            f"Assists: {player.assists}\n"
-            f"Turnovers: {player.turnovers}\n"
-            f"Steals: {player.steals}\n"
-            f"Blocks: {player.blocks}\n\n"
-        )
+            print(
+                f"Simulation Complete: {winner} wins with a final score of {self.score[winner]} to {self.score[loser]}"
+            )
 
     def flush_stats(self):
         for player in self.team1.active_players:
@@ -1434,9 +1458,8 @@ class Game:
     def post_game(self):
         winner = max(self.score, key=self.score.get)
         loser = min(self.score, key=self.score.get)
-        print(f"Winner: {winner}, Loser: {loser}")
-
-        pass
+        league.standings_add_win(winner)
+        league.standings_add_loss(loser)
 
 
 def main_menu():
@@ -1499,17 +1522,18 @@ def new_game():
             league.schedule.remove(user_match)
 
             # Use the user's match to initialize the Game
-            game = Game(user_match[0], user_match[1])
+            game = Game(user_match[0], user_match[1], True)
 
             break  # Break out of the loop once the user has made a valid choice
         except (IndexError, ValueError):
             print("Invalid choice. Please try again.")
 
-    while menu(game, user_team):  # Keep the game running until the user chooses to quit
-        game.simulate_game()
+    while menu(game):  # Keep the game running until the user chooses to quit
+        game.quick_simulate()
 
 
-def menu(game, user_team):
+def menu(game):
+    user_team = user.team
     while True:
         print("\nWhat would you like to do?")
         print(
