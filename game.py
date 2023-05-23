@@ -6,6 +6,8 @@ import requests
 from statistics import mean
 from datetime import datetime, timedelta
 
+# Global Variables
+
 
 TEAM_NAMES = [
     "Atlanta",
@@ -41,9 +43,20 @@ TEAM_NAMES = [
 ]
 
 
-class League:
+class User:
     def __init(self):
+        self.team = ""
+
+
+# Init User Class
+user = User()
+
+
+class League:
+    def __init__(self):
         print(f"League is now Initiated, Setting up..")
+
+        # League Variables
         self.starting_year = 2023
         self.current_year = 2023
         self.fatigue = False
@@ -51,8 +64,8 @@ class League:
         self.month = 1
         self.day = 1
 
-        self.teams
-        self.schedule
+        self.teams = {}  # A Tuple
+        self.schedule = {}
         self.standings = {team: {"wins": 0, "losses": 0} for team in TEAM_NAMES}
 
     # Create a Schedule for all the teams, Randomized and add it to the SCHEDULE Golabal Variable
@@ -94,7 +107,7 @@ class League:
 
         return schedule
 
-    def sort_standings_by_wins(standings):
+    def sort_standings_by_wins(self, standings):
         """
         Sorts the standings by wins.
 
@@ -113,7 +126,7 @@ class League:
 
         return standings_list
 
-    def seek_standings(standings, team_name, mode=1):
+    def seek_standings(self, standings, team_name, mode=1):
         """
         Seeks a dictionary called "standings" using one of its key names.
 
@@ -142,7 +155,7 @@ class League:
 
         return None
 
-    def update_standings(standings, team_name, wins, losses):
+    def update_standings(self, standings, team_name, wins, losses):
         """
         Updates the standings of a team in a dictionary.
 
@@ -164,7 +177,7 @@ class League:
 
         return standings
 
-    def standings_add_win(standings, team_name):
+    def standings_add_win(self, standings, team_name):
         """
         Adds a win to the standings of a team.
 
@@ -183,7 +196,7 @@ class League:
 
         return standings
 
-    def standings_add_loss(standings, team_name):
+    def standings_add_loss(self, standings, team_name):
         """
         Adds a loss to the standings of a team.
 
@@ -201,6 +214,43 @@ class League:
                 break
 
         return standings
+
+    def print_standings(self):
+        """
+        Prints the standings of all teams in a league, along with their wins and losses.
+
+        Args:
+          self: The league object.
+
+        Returns:
+          None.
+
+        Raises:
+          None.
+
+        """
+        team_color = "\033[94m"
+        reset_color = "\033[0m"
+
+        standings = self.standings.copy()
+        self.sort_standings_by_wins(standings)
+
+        print(f"\n\nLeague Standings:\n")
+
+        for team_name, team_data in standings.items():
+            wins = team_data["wins"]
+            losses = team_data["losses"]
+            # Check if the current team name is equal to the user's team.
+            if team_name == user.team:
+                print(
+                    f"{team_color}{team_name}: {wins} wins, {losses} losses (my team){reset_color}"
+                )
+            else:
+                print(f"{team_name}: {wins} wins, {losses} losses")
+
+
+# Initialize the League Class
+league = League()
 
 
 class Team:
@@ -632,6 +682,9 @@ class Game:
         self.already_jumped = False
         self.last_ally_handler = None
         self.ball_handler = None
+
+    def quick_simulate(self):
+        pass
 
     def game_print(self, text):
         team_color = "\033[94m" if self.possession == "team2" else "\033[91m"
@@ -1318,6 +1371,8 @@ class Game:
             time.sleep(1)  # pause for a second between quarters
 
         self.print_result()
+        self.post_game()
+        self.flush_stats()
 
     def substitute_players(self):
         for team in [self.team1, self.team2]:
@@ -1364,7 +1419,6 @@ class Game:
             f"Steals: {player.steals}\n"
             f"Blocks: {player.blocks}\n\n"
         )
-        self.flush_stats()
 
     def flush_stats(self):
         for player in self.team1.active_players:
@@ -1378,6 +1432,10 @@ class Game:
         self.score = {self.team1.name: 0, self.team2.name: 0}
 
     def post_game(self):
+        winner = max(self.score, key=self.score.get)
+        loser = min(self.score, key=self.score.get)
+        print(f"Winner: {winner}, Loser: {loser}")
+
         pass
 
 
@@ -1412,42 +1470,43 @@ def new_game():
     for i, team_name in enumerate(TEAM_NAMES, 1):
         print(f"{i}. {team_name}")
 
-    choice = input("Enter choice: ")
-    try:
-        # after you chose,
-        print(
-            "\nCreating and Generating Team Names, Player Names, Numbers and Stats, Please wait..\nThis might take a while.."
-        )
-        # Assigning your Team
+    while True:
+        choice = input("Enter choice: ")
+        try:
+            # after you chose,
+            print(
+                "\nCreating and Generating Team Names, Player Names, Numbers and Stats, Please wait..\nThis might take a while.."
+            )
+            # Assigning your Team
 
-        user_team = TEAM_NAMES[int(choice) - 1]
-        print(f"\n\nYou picked the {user_team}\n\n")
+            user_team = TEAM_NAMES[int(choice) - 1]
+            print(f"\n\nYou picked the {user_team}\n\n")
 
-        # Initialize the League Class
-        league = League()
-        league.teams = league.create_teams()
-        league.schedule = league.create_schedule()
+            # Save User's Team
+            user.team = user_team
 
-        # Find the match in the schedule with the user's team
-        user_match = None
-        for match in league.schedule:
-            if user_team in [match[0].name, match[1].name]:
-                user_match = match
-                break
+            league.teams = league.create_teams()
+            league.schedule = league.create_schedule()
 
-        # Remove the match from the schedule
-        league.schedule.remove(user_match)
+            # Find the match in the schedule with the user's team
+            user_match = None
+            for match in league.schedule:
+                if user_team in [match[0].name, match[1].name]:
+                    user_match = match
+                    break
 
-        # Use the user's match to initialize the Game
-        game = Game(user_match[0], user_match[1])
+            # Remove the match from the schedule
+            league.schedule.remove(user_match)
 
-        while menu(
-            game, user_team
-        ):  # Keep the game running until the user chooses to quit
-            game.simulate_game()
-    except (IndexError, ValueError):
-        print("Invalid choice. Please try again.")
-        new_game()
+            # Use the user's match to initialize the Game
+            game = Game(user_match[0], user_match[1])
+
+            break  # Break out of the loop once the user has made a valid choice
+        except (IndexError, ValueError):
+            print("Invalid choice. Please try again.")
+
+    while menu(game, user_team):  # Keep the game running until the user chooses to quit
+        game.simulate_game()
 
 
 def menu(game, user_team):
@@ -1511,18 +1570,17 @@ def menu(game, user_team):
                     f"Stealing: {player.stealing}\n"
                     f"Blocking: {player.blocking}\n========"
                 )
+
+        elif choice == "4":
+            league.print_standings()
         elif choice == "5":
             # Save the game
-            save_game(game)
-            print("Game saved!")
+            pass
         elif choice == "6":
             # Save and exit
-            save_game(game)
-            print("Game saved!")
-            return False
+            pass
         elif choice == "7":
-            # Exit without saving
-            return False
+            quit()
         else:
             print("Invalid choice. Please try again.")
 
