@@ -8,6 +8,15 @@ import datetime
 from datetime import datetime, timedelta, date
 import pandas as pd
 from itertools import combinations, product
+from colorama import Fore, Style
+import pickle
+from cryptography.fernet import Fernet
+from termcolor import colored
+
+# generate a key for encryption/decryption
+# IMPORTANT: keep this key safe, if you lose it you won't be able to decrypt your data
+key = Fernet.generate_key()
+cipher_suite = Fernet(key)
 
 
 # Global Variables
@@ -117,29 +126,22 @@ class League:
         teams = league.teams
         schedule = {}
 
-        intra_conference_games = (
-            list(combinations(teams, 2)) * 4
-        )  # 4 games within the same conference
-        inter_conference_games = (
-            list(product(teams[:15], teams[15:])) * 2
-        )  # 2 games with teams from other conference
-        matchups = intra_conference_games + inter_conference_games
-
+        # Each team should play against every other team twice
+        matchups = list(combinations(teams, 2)) * 2
         random.shuffle(matchups)
 
-        last_played = {
-            team: None for team in teams
-        }  # keeps track of when each team last played
-        current_date = start_date
+        # Tracks the last played date of each team
+        last_played = {team: None for team in teams}
 
+        current_date = start_date
         for matchup in matchups:
             # Find a suitable date for the match
             while (
                 current_date in schedule
-                and len(schedule[current_date]) >= 10
-                or last_played[matchup[0]]  # no more than 10 games per day
-                == current_date
-                or last_played[matchup[1]]  # team 0 shouldn't play on consecutive days
+                and len(schedule[current_date]) >= 15  # No more than 15 games per day
+                or last_played[matchup[0]]
+                == current_date  # team 0 shouldn't play on consecutive days
+                or last_played[matchup[1]]
                 == current_date  # team 1 shouldn't play on consecutive days
             ):
                 current_date += timedelta(days=1)
@@ -152,6 +154,13 @@ class League:
             # Update when the teams last played
             last_played[matchup[0]] = current_date
             last_played[matchup[1]] = current_date
+
+        # Fill days with less than 8 games with matchups from the next day
+        keys = list(schedule.keys())
+        for current_date in keys[:-1]:
+            next_date = current_date + timedelta(days=1)
+            while len(schedule[current_date]) < 8 and len(schedule[next_date]) > 8:
+                schedule[current_date].append(schedule[next_date].pop())
 
         return schedule
 
@@ -178,12 +187,12 @@ class League:
         upcoming_games.sort()  # Sort by date
         return upcoming_games[0]  # Return the first upcoming game
 
-    def print_schedule(self, schedule):
-        for date in schedule:
-            matchups = ", ".join(
-                [f"{team1} vs {team2}" for team1, team2 in schedule[date]]
-            )
-            print(f"{date} : {matchups}")
+    def print_schedule(self):
+        schedule = league.schedule
+        for date, matchups in sorted(schedule.items()):
+            print(f"{date}:")
+            for matchup in matchups:
+                print(f"\t{matchup[0].name} vs {matchup[1].name}")
 
     def sort_standings_by_wins(self):
         """
@@ -1440,33 +1449,16 @@ class Game:
         for self.quarter in range(1, 5):  # 4 quarters
             # Quarter start
             print(
-                f"\nQuarter {self.quarter} is about to start! Let's see some action!\n{self.show_score()}"
+                f"\nQuarter {self.quarter} is about to start! Let's see some action!\n{self.show_score()}\n"
             )
             self.choose_strategy(self.team1)  # Let the user choose a strategy
             self.simulate_quarter()
             # Quarter end
             print(
-                f"That's the end of quarter {self.quarter}. The players are taking a breather.\n{self.show_score()}"
+                f"\nThat's the end of quarter {self.quarter}. The players are taking a breather.\n{self.show_score()}\n"
             )
 
-            print("\nGame Stats:")
-            for team in [self.team1, self.team2]:
-                print(f"\n{team.name}:")
-                for player in team.active_players:
-                    print(
-                        f"\n========\n{player.name} {player.position}\n"
-                        f"Points: {player.points}\n"
-                        f"Fouls: {player.fouls}\n"
-                        f"Fatigue: {player.fatigue}\n"
-                        f"FG: {player.field_goals_made}/{player.field_goals_attempted} - {player.field_goal_percentage}%\n"
-                        f"Three Point FG: {player.three_points_made}/{player.three_points_attempted} - {player.three_point_percentage}%\n"
-                        f"Free Throw FG: {player.free_throws_made}/{player.free_throws_attempted} - {player.free_throw_percentage}%\n"
-                        f"Rebounds (O/D - Total): {player.offensive_rebounds}/{player.defensive_rebounds} - {player.rebounds}\n"
-                        f"Assists: {player.assists}\n"
-                        f"Turnovers: {player.turnovers}\n"
-                        f"Steals: {player.steals}\n"
-                        f"Blocks: {player.blocks}\n========\n"
-                    )
+            self.print_team_stats()
 
             time.sleep(1)  # pause for a second between quarters
 
@@ -1525,20 +1517,7 @@ class Game:
             else:
                 mvp = self.team2.get_mvp()
             player = mvp
-            print(
-                f"MVP of the game:{player.name} {player.position}\n"
-                f"Points: {player.points}\n"
-                f"Fouls: {player.fouls}\n"
-                f"Fatigue: {player.fatigue}\n"
-                f"FG: {player.field_goals_made}/{player.field_goals_attempted} - {player.field_goal_percentage}%\n"
-                f"Three Point FG: {player.three_points_made}/{player.three_points_attempted} - {player.three_point_percentage}%\n"
-                f"Free Throw FG: {player.free_throws_made}/{player.free_throws_attempted} - {player.free_throw_percentage}%\n"
-                f"Rebounds (O/D - Total): {player.offensive_rebounds}/{player.defensive_rebounds} - {player.rebounds}\n"
-                f"Assists: {player.assists}\n"
-                f"Turnovers: {player.turnovers}\n"
-                f"Steals: {player.steals}\n"
-                f"Blocks: {player.blocks}\n\n"
-            )
+            print_player_game_stats(player)
         else:
             print(
                 f"Simulation Complete: {winner} wins with a final score of {self.score[winner]} to {self.score[loser]}"
@@ -1560,6 +1539,28 @@ class Game:
         loser = min(self.score, key=self.score.get)
         league.standings_add_win(winner)
         league.standings_add_loss(loser)
+
+    def print_team_stats(self):
+        print(f"{Fore.BLUE}\nGame Stats:{Style.RESET_ALL}")
+        for team in [self.team1, self.team2]:
+            print(f"\n{Fore.YELLOW}{team.name}:{Style.RESET_ALL}")
+            for player in team.active_players:
+                player_info = f"""
+                {Fore.GREEN}========\n{player.name} {player.position}{Fore.RESET}
+                {Fore.GREEN}Points:{Fore.RESET} {player.points}
+                {Fore.GREEN}Fouls:{Fore.RESET} {player.fouls}
+                {Fore.GREEN}Fatigue:{Fore.RESET} {player.fatigue}
+                {Fore.GREEN}Field Goals (FG):{Fore.RESET} {player.field_goals_made}/{player.field_goals_attempted} - {round(player.field_goal_percentage, 2)}%
+                {Fore.GREEN}Three Point FG:{Fore.RESET} {player.three_points_made}/{player.three_points_attempted} - {round(player.three_point_percentage, 2)}%
+                {Fore.GREEN}Free Throw FG:{Fore.RESET} {player.free_throws_made}/{player.free_throws_attempted} - {round(player.free_throw_percentage, 2)}%
+                {Fore.GREEN}Rebounds (O/D - Total):{Fore.RESET} {player.offensive_rebounds}/{player.defensive_rebounds} - {player.rebounds}
+                {Fore.GREEN}Assists:{Fore.RESET} {player.assists}
+                {Fore.GREEN}Turnovers:{Fore.RESET} {player.turnovers}
+                {Fore.GREEN}Steals:{Fore.RESET} {player.steals}
+                {Fore.GREEN}Blocks:{Fore.RESET} {player.blocks}
+                {Fore.GREEN}========{Style.RESET_ALL}\n
+                """
+                print(player_info)
 
 
 def main_menu():
@@ -1622,7 +1623,7 @@ def get_team_by_name(team_name):
 
 
 def menu():
-    print("Entering menu function...")
+    print("Loading Game Menu...")
     user_team = user.team
     date = create_date(league.month, league.day, league.current_year)
     while True:
@@ -1655,16 +1656,16 @@ def menu():
             user_game = None
 
             # Separate user's game if there is one
-            print("Checking today's games for user's team:")
+            # print("Checking today's games for user's team:")
             for i in range(len(schedule[today])):
-                print(
+                """print(
                     f"  Checking game {i+1}: {schedule[today][i][0].name} vs {schedule[today][i][1].name}"
-                )
+                )"""
                 if (
                     user.team == schedule[today][i][0].name
                     or user.team == schedule[today][i][1].name
                 ):
-                    print(f"  User's team found in game {i+1}")
+                    # print(f"  User's team found in game {i+1}")
                     user_game = schedule[today].pop(i)
                     break
 
@@ -1692,23 +1693,7 @@ def menu():
 
         elif choice == "2":
             # logging.info the user team's roster
-            print(f"\nYour Team Roster:\n{game.team1.name}")
-            for player in game.team1.players:
-                print(
-                    f"\n========\n{player.name} ({player.position}) :\n"
-                    f"Overall: {player.get_player_overall()}\n"
-                    f"Offense:\n"
-                    f"3pt: {player.three_point_shooting}\n"
-                    f"Midrange: {player.mid_range_shooting}\n"
-                    f"Finishing: {player.finishing}\n"
-                    f"Passing: {player.passing}\n"
-                    f"Dribbling: {player.dribbling}\n"
-                    f"Speed: {player.speed}\n"
-                    f"Rebounding: {player.rebounding}\n\n"
-                    f"Defense:\n"
-                    f"Stealing: {player.stealing}\n"
-                    f"Blocking: {player.blocking}\n========"
-                )
+            print_team_roster(get_team_by_name(user.team))
 
         elif choice == "3":
             # Show stats for players in the selected team
@@ -1718,53 +1703,110 @@ def menu():
             team_choice = input("Enter choice: ")
             selected_team = Team(TEAM_NAMES[int(team_choice) - 1])
             print(f"\n{selected_team.name} Roster:")
-            for player in selected_team.players:
-                print(
-                    f"\n========\n{player.name} ({player.position}) :\n"
-                    f"Overall: {player.get_player_overall()}\n"
-                    f"Offense:\n"
-                    f"3pt: {player.three_point_shooting}\n"
-                    f"Midrange: {player.mid_range_shooting}\n"
-                    f"Finishing: {player.finishing}\n"
-                    f"Passing: {player.passing}\n"
-                    f"Dribbling: {player.dribbling}\n"
-                    f"Speed: {player.speed}\n"
-                    f"Rebounding: {player.rebounding}\n\n"
-                    f"Defense:\n"
-                    f"Stealing: {player.stealing}\n"
-                    f"Blocking: {player.blocking}\n========"
-                )
+            print_team_roster(selected_team)
 
         elif choice == "4":
             league.print_schedule()
         elif choice == "5":
             league.print_standings()
         elif choice == "6":
-            # Save and exit
-            pass
+            save_game(user, league)
+        elif choice == "7":
+            save_game(user, league)
+            quit()
         elif choice == "8":
             quit()
         else:
             print("[Menu] Invalid choice. Please try again.")
 
 
-# Todo Fix Save and Load to JSON format, Save every stat and make it Loadable as Well
-def save_game(game):
-    with open("save_file.json", "w") as f:
-        json.dump(game.__dict__, f)
-    print("Game saved!")
+def print_player_stats(player):
+    player_info = f"""
+    {Fore.YELLOW}==============
+    {Fore.CYAN}Name: {Fore.GREEN}{player.name} 
+    {Fore.CYAN}Position: {Fore.GREEN}{player.position}
+    {Fore.CYAN}Overall: {Fore.GREEN}{player.get_player_overall()}
+
+    {Fore.CYAN}Offense:
+        {Fore.MAGENTA}3pt Shooting: {Fore.GREEN}{player.three_point_shooting}
+        {Fore.MAGENTA}Midrange Shooting: {Fore.GREEN}{player.mid_range_shooting}
+        {Fore.MAGENTA}Finishing: {Fore.GREEN}{player.finishing}
+        {Fore.MAGENTA}Passing: {Fore.GREEN}{player.passing}
+        {Fore.MAGENTA}Dribbling: {Fore.GREEN}{player.dribbling}
+        {Fore.MAGENTA}Speed: {Fore.GREEN}{player.speed}
+        {Fore.MAGENTA}Rebounding: {Fore.GREEN}{player.rebounding}
+
+    {Fore.CYAN}Defense:
+        {Fore.MAGENTA}Stealing: {Fore.GREEN}{player.stealing}
+        {Fore.MAGENTA}Blocking: {Fore.GREEN}{player.blocking}
+    {Fore.YELLOW}=============={Style.RESET_ALL}
+    """
+    print(player_info)
+
+
+def print_team_roster(team):
+    print(f"\n{Fore.CYAN}{team.name} {Fore.YELLOW}Roster:{Style.RESET_ALL}")
+    for player in team.players:
+        print_player_stats(player)
+
+
+def print_player_game_stats(player):
+    player_game_info = f"""
+    {Fore.GREEN}MVP of the game: {Fore.RESET}{player.name} {player.position}
+    {Fore.GREEN}Points: {Fore.RESET}{player.points}
+    {Fore.GREEN}Fouls: {Fore.RESET}{player.fouls}
+    {Fore.GREEN}Fatigue: {Fore.RESET}{player.fatigue}
+    {Fore.GREEN}Field Goals (FG): {Fore.RESET}{player.field_goals_made}/{player.field_goals_attempted} - {round(player.field_goal_percentage, 2)}%
+    {Fore.GREEN}Three Point FG: {Fore.RESET}{player.three_points_made}/{player.three_points_attempted} - {round(player.three_point_percentage, 2)}%
+    {Fore.GREEN}Free Throw FG: {Fore.RESET}{player.free_throws_made}/{player.free_throws_attempted} - {round(player.free_throw_percentage, 2)}%
+    {Fore.GREEN}Rebounds (O/D - Total): {Fore.RESET}{player.offensive_rebounds}/{player.defensive_rebounds} - {player.rebounds}
+    {Fore.GREEN}Assists: {Fore.RESET}{player.assists}
+    {Fore.GREEN}Turnovers: {Fore.RESET}{player.turnovers}
+    {Fore.GREEN}Steals: {Fore.RESET}{player.steals}
+    {Fore.GREEN}Blocks: {Fore.RESET}{player.blocks}
+    """
+    print(player_game_info)
+
+
+def save_game(user, league):
+    print(colored("\nSaving game... Please wait.", "yellow"))
+    try:
+        # Prepare data for saving
+        data_to_save = {"user": user, "league": league}
+
+        # Write data to file
+        with open("game_save.pkl", "wb") as f:
+            pickle.dump(data_to_save, f)
+
+        print(colored("\nGame saved successfully!", "green"))
+    except Exception as e:
+        print(colored(f"\nAn error occurred while saving the game: {e}", "red"))
 
 
 def load_game():
-    if os.path.exists("save_file.json"):
-        with open("save_file.json", "r") as f:
-            game_data = json.load(f)
-        game = Game(game_data["user_team"], game_data["ai_team"])
-        print(f"Loaded game: {game.score}")
-        game.simulate_game()
-    else:
-        print("No saved game found.")
-        main_menu()
+    print(colored("\nLoading game... Please wait.", "yellow"))
+    try:
+        if not os.path.exists("game_save.pkl"):
+            raise FileNotFoundError("Save file not found.")
+
+        # Load data from file
+        with open("game_save.pkl", "rb") as f:
+            loaded_data = pickle.load(f)
+
+        # Reinitialize User and League classes
+        user = User()
+        league = League()
+
+        # Load the data into the new instances
+        user.__dict__ = loaded_data["user"].__dict__
+        league.__dict__ = loaded_data["league"].__dict__
+
+        print(colored("\nGame loaded successfully!", "green"))
+
+        # Return to the main menu
+        menu()
+    except Exception as e:
+        print(colored(f"\nAn error occurred while loading the game: {e}", "red"))
 
 
 def quit():
