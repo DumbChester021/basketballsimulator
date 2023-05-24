@@ -4,8 +4,10 @@ import random
 import time
 import requests
 from statistics import mean
+import datetime
 from datetime import datetime, timedelta, date
 import pandas as pd
+from itertools import combinations, product
 
 
 # Global Variables
@@ -68,7 +70,9 @@ class League:
 
         self.teams = {}  # A Tuple
         self.schedule = {}
-        self.standings = {team: {"wins": 0, "losses": 0} for team in TEAM_NAMES}
+        self.standings = {
+            team: {"wins": 0, "losses": 0, "pct": 0.0} for team in TEAM_NAMES
+        }
 
     # Create a Schedule for all the teams, Randomized and add it to the SCHEDULE Golabal Variable
 
@@ -90,83 +94,65 @@ class League:
         return teams  # Return the list of teams
 
     """Each team will play a total of 82 games in the regular season. 
-    The regular season will end on April 10th."""
+    The regular season starts at june 21 2023. which should be : start_date = date(league.current_year, league.month, league.day)
 
-    """Method to Create a Schedule:
+    Method to Create a Schedule:
+    dont forget to include self as args not league def create_schedule(self)
+    dont use datetime.date or datetime.timedelta, theyre already imported individually so you can use date adn timedelta directly
 
     it Should be getting the teams from league.teams
     start date should be from league.month, league.day, league.current_year (All integers) converted to datetime
     Generate Schedules for the Teams:
-        each team should battle every team twice
-        each team cant have 2 games at the same day
+        generation should be random, like round robin or something
+        each team should battle every team atleast twice
+        each team cant have more than 1 game at the same day
         each team cant have back to back games i.e: game in june 21 then game in june 22
-        2 games generated per day
+        10 games generated per day
         schedule should be a dictionary like this: schedule: (startdate): {matchup1: {team1, team2}, matchup2: {team1, team2}}, (nextday) {matchup1: {team1, team2}, matchup2: {team1, team2}} etc..
     should return the schedule dictionary
     """
 
     def create_schedule(self):
-        """Creates a schedule of games for a league.
-
-        Args:
-            self: The league object.
-
-        Returns:
-            A dictionary mapping dates to lists of matchups.
-
-        """
-
-        # Get the list of teams in the league.
+        start_date = date(league.current_year, league.month, league.day)
         teams = league.teams
+        schedule = {}
 
-        # Get the start date of the season.
-        start_date = create_date(league.month, league.day, league.current_year)
+        intra_conference_games = (
+            list(combinations(teams, 2)) * 4
+        )  # 4 games within the same conference
+        inter_conference_games = (
+            list(product(teams[:15], teams[15:])) * 2
+        )  # 2 games with teams from other conference
+        matchups = intra_conference_games + inter_conference_games
 
-        # Sched
-        schedule = league.schedule
+        random.shuffle(matchups)
 
-        # Create a dictionary to keep track of teams' games.
-        team_games = {}
+        last_played = {
+            team: None for team in teams
+        }  # keeps track of when each team last played
+        current_date = start_date
 
-        # For each day in the season:
-        for day in range((len(teams) * 2) // 2):
-            # Get the date for that day.
-            date = start_date + timedelta(days=day)
+        for matchup in matchups:
+            # Find a suitable date for the match
+            while (
+                current_date in schedule
+                and len(schedule[current_date]) >= 10
+                or last_played[matchup[0]]  # no more than 10 games per day
+                == current_date
+                or last_played[matchup[1]]  # team 0 shouldn't play on consecutive days
+                == current_date  # team 1 shouldn't play on consecutive days
+            ):
+                current_date += timedelta(days=1)
 
-            # Create a list to store the matchups for that day.
-            matchups = []
+            # Schedule the game
+            if current_date not in schedule:
+                schedule[current_date] = []
+            schedule[current_date].append(matchup)
 
-            # Generate only 2 matchups per day
-            for i in range(2):
-                # For each team in the league:
-                for team in teams:
-                    # Check if the team has a game that day already.
-                    if team not in team_games or date not in team_games[team]:
-                        # Get the list of potential opponents for the team.
-                        opponent = teams[teams.index(team) + 1 :]
+            # Update when the teams last played
+            last_played[matchup[0]] = current_date
+            last_played[matchup[1]] = current_date
 
-                        # If there are still opponents left:
-                        if len(opponent) > 0:
-                            # Get the first opponent.
-                            opponent = opponent[0]
-
-                            # Add the matchup to the list of matchups for that day.
-                            matchups.append({team, opponent})
-
-                            # Add the game to the list of games for the opponent.
-                            if opponent not in team_games:
-                                team_games[opponent] = [date]
-                            else:
-                                team_games[opponent].append(date)
-
-                        # Remove the opponent from the list of potential opponents.
-                        if opponent in teams:
-                            teams.remove(opponent)
-
-            # Add the list of matchups for that day to the schedule.
-            schedule[date] = matchups[:2]
-
-        # Return the schedule.
         return schedule
 
     """Create a method for searching Upcoming matchup
@@ -201,19 +187,28 @@ class League:
 
     def sort_standings_by_wins(self):
         """
-        Sorts the standings by number of wins, in descending order.
+        Sorts the league's standings by wins (descending), then by losses (ascending).
 
         Args:
-          self: The league object.
+            self: The league object.
 
         Returns:
-          standings: A dictionary of the standings sorted by wins, in descending order.
+            A dictionary of the sorted standings.
+
+        Raises:
+            None.
 
         """
-        standings = sorted(
-            self.standings.items(), key=lambda x: x[1]["wins"], reverse=True
+        # Sort the dictionary by wins (descending), then by losses (ascending).
+        standings = dict(
+            sorted(
+                self.standings.items(),
+                key=lambda item: (item[1]["wins"], -item[1]["losses"]),
+                reverse=True,
+            )
         )
-        return dict(standings)
+
+        return standings
 
     def seek_standings(self, standings, team_name, mode=1):
         """
@@ -262,6 +257,10 @@ class League:
             if team_key == team_name:
                 team_value["wins"] += wins
                 team_value["losses"] += losses
+                team_value["pct"] = standings[team_name]["wins"] / (
+                    standings[team_name]["wins"] + standings[team_name]["losses"]
+                )
+
                 break
 
         return standings
@@ -282,6 +281,9 @@ class League:
         for team_key, team_value in standings.items():
             if team_key == team_name:
                 team_value["wins"] += 1
+                team_value["pct"] = standings[team_name]["wins"] / (
+                    standings[team_name]["wins"] + standings[team_name]["losses"]
+                )
                 break
 
         return standings
@@ -301,13 +303,16 @@ class League:
         for team_key, team_value in standings.items():
             if team_key == team_name:
                 team_value["losses"] += 1
+                team_value["pct"] = standings[team_name]["wins"] / (
+                    standings[team_name]["wins"] + standings[team_name]["losses"]
+                )
                 break
 
         return standings
 
     def print_standings(self):
         """
-        Prints the standings of all teams in a league, along with their wins and losses.
+        Prints the standings of all teams in a league, along with their wins, losses and GB.
 
         Args:
           self: The league object.
@@ -323,19 +328,22 @@ class League:
         reset_color = "\033[0m"
 
         standings = self.sort_standings_by_wins()
+        best_record = list(standings.values())[0]
 
         print(f"\n\nLeague Standings:\n")
-
+        print(f"{'Team':<20}{'W':<5}{'L':<5}{'Pct':<7}{'GB':<5}")
         for team_name, team_data in standings.items():
             wins = team_data["wins"]
             losses = team_data["losses"]
+            pct = team_data["pct"]
+            gb = ((best_record["wins"] - wins) + (losses - best_record["losses"])) / 2
             # Check if the current team name is equal to the user's team.
             if team_name == user.team:
                 print(
-                    f"{team_color}{team_name}: {wins} wins, {losses} losses (my team){reset_color}"
+                    f"{team_color}{team_name:<20}{wins:<5}{losses:<5}{pct:<7.3f}{gb:<5.1f} (my team){reset_color}"
                 )
             else:
-                print(f"{team_name}: {wins} wins, {losses} losses")
+                print(f"{team_name:<20}{wins:<5}{losses:<5}{pct:<7.3f}{gb:<5.1f}")
 
 
 # Initialize the League Class
@@ -1427,7 +1435,7 @@ class Game:
 
     def simulate_game(self):
         print(
-            f"Match for today : {self.team1.name}, Ovr: {self.team1.get_team_overall()} v.s {self.team2.name} {self.team2.get_team_overall()}\n{self.team1.name}'s star player: {self.team1.get_star_player().name} = Ovr: {self.team1.get_star_player().get_player_overall()}\n{self.team2.name}'s star player: {self.team2.get_star_player().name} = Ovr: {self.team2.get_star_player().get_player_overall()}\n"
+            f"\n\nMatch for today : {self.team1.name}, Ovr: {self.team1.get_team_overall()} v.s {self.team2.name} {self.team2.get_team_overall()}\n{self.team1.name}'s star player: {self.team1.get_star_player().name} = Ovr: {self.team1.get_star_player().get_player_overall()}\n{self.team2.name}'s star player: {self.team2.get_star_player().name} = Ovr: {self.team2.get_star_player().get_player_overall()}\n"
         )
         for self.quarter in range(1, 5):  # 4 quarters
             # Quarter start
@@ -1468,7 +1476,7 @@ class Game:
 
     def quick_simulate(self):
         print(
-            f"Simulating : {self.team1.name}, Ovr: {self.team1.get_team_overall()} v.s {self.team2.name} {self.team2.get_team_overall()}\n{self.team1.name}'s star player: {self.team1.get_star_player().name} = Ovr: {self.team1.get_star_player().get_player_overall()}\n{self.team2.name}'s star player: {self.team2.get_star_player().name} = Ovr: {self.team2.get_star_player().get_player_overall()}\n"
+            f"\n\nSimulating : {self.team1.name}, Ovr: {self.team1.get_team_overall()} v.s {self.team2.name} {self.team2.get_team_overall()}\n{self.team1.name}'s star player: {self.team1.get_star_player().name} = Ovr: {self.team1.get_star_player().get_player_overall()}\n{self.team2.name}'s star player: {self.team2.get_star_player().name} = Ovr: {self.team2.get_star_player().get_player_overall()}\n"
         )
         for self.quarter in range(1, 5):  # 4 quarters
             # Quarter start
@@ -1587,21 +1595,30 @@ def new_game():
 
     while True:
         choice = input("[New_Game] Enter choice: ")
-        if choice == "1":
-            print(
-                "\nCreating and Generating Team Names, Player Names, Numbers and Stats, Please wait..\nThis might take a while.."
-            )
-            # Assigning your Team
-            user_team = TEAM_NAMES[int(choice) - 1]
-            print(f"\n\nYou picked the {user_team}\n\n")
-            # Save User's Team
-            user.team = user_team
-            league.teams = league.create_teams()
-            league.schedule = league.create_schedule()
-            menu()
-            break
-        else:
-            print("[New Game] Invalid choice. Please try again.")
+        try:
+            choice = int(choice)
+            if 1 <= choice <= len(TEAM_NAMES):
+                print(
+                    "\nCreating and Generating Team Names, Player Names, Numbers and Stats, Please wait..\nThis might take a while.."
+                )
+                # Assigning your Team
+                user_team = TEAM_NAMES[choice - 1]
+                print(f"\n\nYou picked the {user_team}\n\n")
+                # Save User's Team
+                user.team = user_team
+                league.teams = league.create_teams()
+                league.schedule = league.create_schedule()
+                menu()
+                break
+            else:
+                print("[New Game] Invalid choice. Please try again.")
+        except ValueError:
+            print("[New Game] Invalid input. Please enter a number.")
+
+
+def get_team_by_name(team_name):
+    """Returns the team object for the given team name."""
+    return next(team for team in league.teams if team.name == team_name)
 
 
 def menu():
@@ -1614,10 +1631,11 @@ def menu():
         date_str = date.strftime("%B %d")
         todays_games = [g for g in league.schedule[date] if user_team in g]
         for g in league.schedule[date]:
-            if user_team in g:
-                print(f"\033[31m{list(g)[0].name} @ {list(g)[1].name}\033[0m")
+            if user_team == g[0].name or user_team == g[1].name:
+                print(f"\033[31m{g[0].name} @ {g[1].name}\033[0m")
             else:
-                print(f"{list(g)[0].name} @ {list(g)[1].name}")
+                print(f"{g[0].name} @ {g[1].name}")
+
         print("\nWhat would you like to do?")
         print(
             f"1. Simulate Other Games and Play to the Next Game ({user_team})"
@@ -1632,45 +1650,45 @@ def menu():
 
         choice = input("[Menu] Enter your choice: ")
         if choice == "1":
-            """This is inside a method, and is not a method bu tis triggered
-
-            It should check if the user team has a match today, to get the team name of the user use : user.team
-            simulate 1 game at a time
-            if it doesnt have a game for today, simulate the other games by:
-                setting the teams: game.team1 and game.team2 then game.ai_vs_ai = True
-                then game.quick_simulate()
-            then when all matches for today has been simulated, increment the day by modifying league.month, league.day, league.current_year
-            if finally there's a match for user.team
-                set the teams: game.team1 and game.team2 then game.ai_vs_ai = False
-                then game.simulate_game()
-            same increment the date after
-
-            """
             today = date
             schedule = league.schedule
+            user_game = None
 
+            # Separate user's game if there is one
+            print("Checking today's games for user's team:")
+            for i in range(len(schedule[today])):
+                print(
+                    f"  Checking game {i+1}: {schedule[today][i][0].name} vs {schedule[today][i][1].name}"
+                )
+                if (
+                    user.team == schedule[today][i][0].name
+                    or user.team == schedule[today][i][1].name
+                ):
+                    print(f"  User's team found in game {i+1}")
+                    user_game = schedule[today].pop(i)
+                    break
+
+            if user_game:
+                print("User's game found:")
+                print(user_game)
+            else:
+                print("User's game not found.")
+
+            # Quick simulate the rest of the games
             for match in schedule[today]:
-                if user.team not in match:
-                    ai = True
-                    match_team1, match_team2 = match
-                    game = Game(match_team1, match_team2, ai)
-                    game.quick_simulate()
-                    for i in range(len(schedule[today]) - 1, -1, -1):
-                        if schedule[today][i] == match:
-                            del schedule[today][i]
+                game = Game(match[0], match[1], True)
+                game.quick_simulate()
 
-                if user.team in match:
-                    ai = False
-                    match_team1, match_team2 = match
-                    game = Game(match_team1, match_team2, ai)
-                    game.simulate_game()
-                    for i in range(len(schedule[today]) - 1, -1, -1):
-                        if schedule[today][i] == match:
-                            del schedule[today][i]
+            # Simulate the user's game
+            if user_game:
+                game = Game(user_game[0], user_game[1], False)
+                game.simulate_game()
 
-            if not schedule[today]:
-                del schedule[today]
-                date = increment_date(date)
+            # Clear the games for the day
+            del schedule[today]
+
+            # Increment date
+            date = increment_date(date)
 
         elif choice == "2":
             # logging.info the user team's roster
@@ -1718,11 +1736,9 @@ def menu():
                 )
 
         elif choice == "4":
-            l = league.create_schedule_with_dates(league.schedule)
-            league.print_schedules(l)
+            league.print_schedule()
         elif choice == "5":
             league.print_standings()
-            pass
         elif choice == "6":
             # Save and exit
             pass
