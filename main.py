@@ -12,6 +12,9 @@ from colorama import Fore, Style
 import pickle
 from cryptography.fernet import Fernet
 from termcolor import colored
+from collections import Counter, deque, defaultdict
+from random import randint, shuffle, choice, sample, choices
+from queue import PriorityQueue
 
 # generate a key for encryption/decryption
 # IMPORTANT: keep this key safe, if you lose it you won't be able to decrypt your data
@@ -55,6 +58,8 @@ TEAM_NAMES = [
     "Washington",
 ]
 
+debug = True
+
 
 class User:
     def __init(self):
@@ -63,6 +68,11 @@ class User:
 
 # Init User Class
 user = User()
+
+
+class Schedule:
+    def __init__(self):
+        self.games = {}
 
 
 class League:
@@ -102,67 +112,98 @@ class League:
             """
         return teams  # Return the list of teams
 
-    """Each team will play a total of 82 games in the regular season. 
-    The regular season starts at june 21 2023. which should be : start_date = date(league.current_year, league.month, league.day)
+    """
+    A function for an NBA like simulator game/GM/Coaching game
+    function name : create_schedule(self)
+    args Self
+    returns Schedule = { date: {team1, team2}, {team1, team2} date: {team1, team2}, {team1, team2} } etc..
 
-    Method to Create a Schedule:
-    dont forget to include self as args not league def create_schedule(self)
-    dont use datetime.date or datetime.timedelta, theyre already imported individually so you can use date adn timedelta directly
+    variable reference:
+        start_date = create_date(league.month, league.day, league.current_year) #This is the starting date of the Reular Season
+        end_date = start_date + timedelta(days=6 * 30)  #Season lasts for 6months
+        teams = league.teams #contains the teams
 
-    it Should be getting the teams from league.teams
-    start date should be from league.month, league.day, league.current_year (All integers) converted to datetime
-    Generate Schedules for the Teams:
-        generation should be random, like round robin or something
-        each team should battle every team atleast twice
-        each team cant have more than 1 game at the same day
-        each team cant have back to back games i.e: game in june 21 then game in june 22
-        10 games generated per day
-        schedule should be a dictionary like this: schedule: (startdate): {matchup1: {team1, team2}, matchup2: {team1, team2}}, (nextday) {matchup1: {team1, team2}, matchup2: {team1, team2}} etc..
-    should return the schedule dictionary
+    --------------------------------------------------------
+    -Each team will play a total of 58 games in the regular season. 
+    -The regular season starts at june 21 2023 and Runs for 6 months
+    -each team should battle every team twice
+    -each team cant have more than 1 game at the same day
+    -Avoid Back to Back games for teams as possible checking day before and day after
+    -Each team can only play 5 times in 1 week
+    -There should be 4 minimum games per day up to 12 maximum
+    -matchup selection: team with fewer/fewest games played should be prioritized in matchup selection
+
+
+    notes:
+    -Please dont use "datetime." just direct those since i imported them already,
+    -please dont change the league to self, since i have an object named league and im referenceing to that not to self
+    -Dont put self to create_date, that's a global function
     """
 
     def create_schedule(self):
-        start_date = date(league.current_year, league.month, league.day)
         teams = league.teams
-        schedule = {}
+        # Initialize game count and schedule
+        game_counts = defaultdict(int)
+        schedule = defaultdict(list)
 
-        # Each team should play against every other team twice
-        matchups = list(combinations(teams, 2)) * 2
-        random.shuffle(matchups)
-
-        # Tracks the last played date of each team
-        last_played = {team: None for team in teams}
-
+        # Initialize dates and matchups
+        start_date = create_date(league.month, league.day, league.current_year)
+        end_date = start_date + timedelta(days=6 * 30)
         current_date = start_date
-        for matchup in matchups:
-            # Find a suitable date for the match
-            while (
-                current_date in schedule
-                and len(schedule[current_date]) >= 15  # No more than 15 games per day
-                or last_played[matchup[0]]
-                == current_date  # team 0 shouldn't play on consecutive days
-                or last_played[matchup[1]]
-                == current_date  # team 1 shouldn't play on consecutive days
-            ):
-                current_date += timedelta(days=1)
 
-            # Schedule the game
-            if current_date not in schedule:
-                schedule[current_date] = []
-            schedule[current_date].append(matchup)
+        # Generate all possible matchups
+        all_matchups = (
+            list(combinations(league.teams, 2)) * 2
+        )  # each team plays every other team twice
+        random.shuffle(all_matchups)  # shuffle matchups to ensure randomness
 
-            # Update when the teams last played
-            last_played[matchup[0]] = current_date
-            last_played[matchup[1]] = current_date
+        # Auxiliary function to check if a team already has a game scheduled on a given date
+        def has_game(team, date):
+            for game in schedule[date]:
+                if team in game:
+                    return True
+            return False
 
-        # Fill days with less than 8 games with matchups from the next day
-        keys = list(schedule.keys())
-        for current_date in keys[:-1]:
-            next_date = current_date + timedelta(days=1)
-            while len(schedule[current_date]) < 8 and len(schedule[next_date]) > 8:
-                schedule[current_date].append(schedule[next_date].pop())
+        while current_date <= end_date and all_matchups:
+            # Try to schedule games for the current date
+            games_today = schedule[current_date]
+            for matchup in all_matchups[:]:
+                team1, team2 = matchup
 
-        return schedule
+                # Ensure teams have not exceeded the game limit and are not already scheduled to play today
+                if (
+                    game_counts[team1] < 58
+                    and game_counts[team2] < 58
+                    and not has_game(team1, current_date)
+                    and not has_game(team2, current_date)
+                    and len(games_today) < 8
+                ):
+                    # Add game to schedule and update game count
+                    games_today.append(matchup)
+                    game_counts[team1] += 1
+                    game_counts[team2] += 1
+                    all_matchups.remove(matchup)
+
+                    # Check if a team is scheduled to play the day before or the day after
+                    if (
+                        has_game(team1, current_date - timedelta(days=1))
+                        or has_game(team1, current_date + timedelta(days=1))
+                        or has_game(team2, current_date - timedelta(days=1))
+                        or has_game(team2, current_date + timedelta(days=1))
+                    ):
+                        # If so, remove the game from the schedule and decrement the game count
+                        games_today.remove(matchup)
+                        game_counts[team1] -= 1
+                        game_counts[team2] -= 1
+                        all_matchups.append(matchup)
+
+            # Update the schedule with today's games
+            schedule[current_date] = games_today
+
+            # Proceed to the next date
+            current_date += timedelta(days=1)
+
+        return dict(schedule)
 
     """Create a method for searching Upcoming matchup
     Searches the schedule for the next matchup involving the given team.
@@ -188,11 +229,18 @@ class League:
         return upcoming_games[0]  # Return the first upcoming game
 
     def print_schedule(self):
+        user_team = user.team
         schedule = league.schedule
         for date, matchups in sorted(schedule.items()):
-            print(f"{date}:")
+            print(f"{date.strftime('%Y-%m-%d')}:")
             for matchup in matchups:
-                print(f"\t{matchup[0].name} vs {matchup[1].name}")
+                team1_name = matchup[0].name
+                team2_name = matchup[1].name
+                match_str = f"\t{team1_name} vs {team2_name}"
+                if user_team == team1_name or user_team == team2_name:
+                    print(colored(match_str, "red"))
+                else:
+                    print(match_str)
 
     def sort_standings_by_wins(self):
         """
@@ -373,6 +421,12 @@ class Team:
     ]
 
     def __init__(self, name, strategy="Balanced"):
+        # Schedule related
+        self.games_played = 0
+        self.games_today = 0
+        self.games_last7days = deque(maxlen=7)
+        self.back_to_back_count = 0
+
         self.name = name
         self.strategy = random.choice(self.STRATEGIES)
 
@@ -1834,6 +1888,11 @@ def increment_date(date):
     # Increment by 1 day
     new_date = date + timedelta(days=1)
     return new_date
+
+
+def debug_print(message):
+    if debug:
+        print(f"Debug: {message}")
 
 
 if __name__ == "__main__":
