@@ -63,7 +63,7 @@ debug = False
 
 class User:
     def __init(self):
-        self.team = ""
+        self.team_name = ""
 
 
 # Init User Class
@@ -227,7 +227,7 @@ class League:
         return upcoming_games[0]  # Return the first upcoming game
 
     def print_schedule(self):
-        user_team = user.team
+        user_team = user.team_name
         schedule = league.schedule
         for date, matchups in sorted(schedule.items()):
             print(f"{date.strftime('%Y-%m-%d')}:")
@@ -393,7 +393,7 @@ class League:
             pct = team_data["pct"]
             gb = ((best_record["wins"] - wins) + (losses - best_record["losses"])) / 2
             # Check if the current team name is equal to the user's team.
-            if team_name == user.team:
+            if team_name == user.team_name:
                 print(
                     f"{team_color}{team_name:<20}{wins:<5}{losses:<5}{pct:<7.3f}{gb:<5.1f} (my team){reset_color}"
                 )
@@ -579,6 +579,7 @@ class Player:
 
         # non transferrable to all_time_stats
         self.fatigue = 0
+        self.bench_start_time = [1, 720]  # quarter, time in minutes
         # Temporary Attribute Bonus
         self.three_point_shooting_bonus = 0
         self.mid_range_shooting_bonus = 0
@@ -674,45 +675,34 @@ class Player:
 
         self.endurance = self.assign_stat("endurance")
 
-    def decrease_stats(self):  # Decreasing Stats based on their Fatigue Level
-        self.three_point_shooting -= self.fatigue
-        self.mid_range_shooting -= self.fatigue
-        self.finishing -= self.fatigue
-        self.free_throw_shooting -= self.fatigue
+    def apply_fatigue(self):  # Decreasing Stats based on their Fatigue Level
+        self.three_point_shooting_bonus -= self.fatigue // 30
+        self.mid_range_shooting_bonus -= self.fatigue // 30
+        self.finishing_bonus -= self.fatigue // 30
+        self.free_throw_shooting_bonus -= self.fatigue // 30
 
-        self.rebounding -= self.fatigue
+        self.rebounding_bonus -= self.fatigue // 30
 
-        self.passing -= self.fatigue
+        self.passing_bonus -= self.fatigue // 30
 
-        self.speed -= self.fatigue
+        self.speed_bonus -= self.fatigue // 30
 
-        self.dribbling -= self.fatigue
+        self.dribbling_bonus -= self.fatigue // 30
 
-        self.stealing -= self.fatigue
+        self.stealing_bonus -= self.fatigue // 30
 
-        self.blocking -= self.fatigue
+        self.blocking_bonus -= self.fatigue // 30
 
-        self.endurance -= self.fatigue
+        self.endurance_bonus -= self.fatigue // 30
 
-    def recover_stats(self):  # Stats Recovery when their on the bench
-        self.three_point_shooting += self.fatigue
-        self.mid_range_shooting += self.fatigue
-        self.finishing += self.fatigue
-        self.free_throw_shooting += self.fatigue
+    def recover(self, current_quarter, current_time):
+        base_time = self.bench_start_time[0] * 12
+        start_time = ((base_time - 12) * 60) + self.bench_start_time[1]
 
-        self.rebounding += self.fatigue
+        end_time = (((current_quarter * 12) - 12) * 60) + current_time
 
-        self.passing += self.fatigue
-
-        self.speed += self.fatigue
-
-        self.dribbling += self.fatigue
-
-        self.stealing += self.fatigue
-
-        self.blocking += self.fatigue
-
-        self.endurance += self.fatigue
+        self.fatigue -= ((start_time - end_time) // 60) * 10
+        self.apply_fatigue()
 
     # Todo: Distribute Points Efficiently, Current Distribution is OP and also isnt limited to 100
     def assign_stat(self, stat):
@@ -948,8 +938,48 @@ class Game:
             # Add other attributes as needed
         }
 
+    def in_game_menu(self, team1, team2):
+        while True:
+            print(
+                f"{Fore.CYAN}\n{'*' * 30} IN-GAME MENU {'*' * 30}\n"
+                f"{Fore.YELLOW}\nChoose what to do:\n"
+                f"1. Change Strategy\n"
+                f"2. Substitution\n"
+                f"3. Check your Roster\n"
+                f"4. Check Opponents Roster\n"
+                f"5. Continue Game\n"
+                f"{Fore.CYAN}\n{'*' * 80}\n{Fore.RESET}"
+            )
+            choice = int(input("[In-Game Menu] Enter your choice: "))
+            if choice == 1:  # Change Strategy
+                if user.team_name == self.team1.name:
+                    self.choose_strategy(self.team1)
+                else:
+                    self.choose_strategy(self.team2)
+            elif choice == 2:  # Sub Menu
+                if user.team_name == self.team1.name:
+                    self.substitution_menu(self.team1)
+                else:
+                    self.substitution_menu(self.team2)
+            elif choice == 3:
+                if user.team_name == self.team1.name:
+                    self.substitution_menu(self.team1)
+                else:
+                    self.substitution_menu(self.team2)
+            elif choice == 4:
+                if user.team_name == self.team1.name:
+                    self.substitution_menu(self.team1)
+                else:
+                    self.substitution_menu(self.team2)
+            elif choice == 5:
+                break
+            else:
+                print("[In-Game Menu]Invalid Choice")
+                continue
+
     def choose_strategy(self, team):
-        print(f"\nChoose a strategy for the {team.name} team:")
+        print(f"{Fore.BLUE}\n{'=' * 30} STRATEGY SELECTION {'=' * 30}")
+        print(f"Choose a strategy for your {team.name} team:\n{Fore.RESET}")
         for i, strategy in enumerate(Team.STRATEGIES, 1):
             print(f"{i}. {strategy}")
 
@@ -957,9 +987,74 @@ class Game:
             try:
                 choice = int(input("Enter your choice: ")) - 1
                 team.strategy = Team.STRATEGIES[choice]
+                print(f"\n\nChanged team Strategy to {team.strategy}\n")
                 break
             except (IndexError, ValueError):
-                print("Invalid choice. Please try again.")
+                print("Invalid choice, Please try again.")
+
+    def substitution_menu(self, team):
+        print(
+            f"{Fore.GREEN}\n{'+' * 30} SUBSTITUTION MENU {'+' * 30}\n"
+            f"{Fore.YELLOW}\nChoose a Player that you want to Sub Out (or enter 0 to go back)\n\n"
+            f"{Fore.GREEN}\n{'+' * 80}\n{Fore.RESET}\n\n"
+        )
+        if user.team_name == self.team1.name:
+            user_team = self.team1
+        else:
+            user_team = self.team2
+        for i, player in enumerate(user_team.active_players, 1):
+            print(
+                f"{i}. {player.name} {player.position} - Ovr: {player.get_player_overall()}, Pts: {player.points}, Fls: {player.fouls}, Fatigue: {player.fatigue} "
+            )
+        while True:
+            try:
+                choice_out = (
+                    int(input("\nSelect Player to Sub Out (or enter 0 to go back): "))
+                    - 1
+                )
+                if choice_out == -1:
+                    print("\nReturning to the previous menu\n")
+                    return
+                print(f"You chose {user_team.active_players[choice_out]} to sub out")
+                print(f"\n\nNow, Choose who to Sub in:")
+                for i, player in enumerate(user_team.bench_players, 1):
+                    print(
+                        f"{i}. {player.name} {player.position} - Ovr: {player.get_player_overall()}, Pts: {player.points}, Fls: {player.fouls}, Fatigue: {player.fatigue} "
+                    )
+                while True:
+                    try:
+                        choice_in = (
+                            int(
+                                input(
+                                    "\nSelect Player to Sub In (or enter 0 to go back):"
+                                )
+                            )
+                            - 1
+                        )
+                        if choice_in == -1:
+                            print("\nReturning to the previous menu\n")
+                            return
+                        print(f"You chose {user_team.bench_players[choice_in]}\n")
+                        self.swap_players(user_team, choice_out, choice_in)
+                        return
+
+                    except (IndexError, ValueError):
+                        print("Invalid Choice, Please try again")
+                break
+            except (IndexError, ValueError):
+                print("Invalid Choice, Please try again")
+
+    def swap_players(self, team, player_out_index, player_in_index):
+        # Retrieve the players to be swapped
+        player_out = team.active_players[player_out_index]
+        player_in = team.bench_players[player_in_index]
+
+        # Swap the players
+        team.active_players[player_out_index] = player_in
+        team.bench_players[player_in_index] = player_out
+
+        # Print a message to let the user know the swap has been made
+        print(f"\n{player_out.name} has been subbed out for {player_in.name}.\n")
 
     def simulate_quarter(self):
         if self.ai_vs_ai == False:
@@ -1012,7 +1107,7 @@ class Game:
             elif self.possession == "team2":
                 offensive_players = self.team2.active_players
             else:
-                print(f"DevMode: Possession Invalid : {possession}")
+                debug_print(f"Possession Invalid : {possession}")
             defensive_players = (
                 self.team2.active_players
                 if self.possession == "team1"
@@ -1040,9 +1135,9 @@ class Game:
             )
             debug_print("successfully returned from select_defensive_player")
             # Check if Quarter is Ending
-            if self.quarter_time < 24 and self.quarter == 4:
-                game_print(
-                    f"Now, We're at the 4th Qaurter with {self.quarter} seconds Remaining in the clock!\nEveryone is on their knees, What will {offensive_player.name} do?"
+            if self.quarter_time < 24:
+                self.game_print(
+                    f"Now, We're at Qaurter {self.quarter} with {self.quarter} seconds Remaining in the clock!\nEveryone is on their knees, What will {offensive_player.name} do?"
                 )
                 self.clutch_time == True
                 break
@@ -1127,7 +1222,6 @@ class Game:
                         # print(f"DevMode: Made Shot")
                         self.possession_switch()
                     # Add fatigue to the players
-                    self.add_fatigue()
             else:
                 if self.shot_clock < 4:
                     pre_possession_time = random.randint(1, 3)
@@ -1136,6 +1230,8 @@ class Game:
                 debug_print(f"Pre-Possesion time is {pre_possession_time}")
                 self.quarter_time -= pre_possession_time
                 self.shot_clock -= pre_possession_time
+
+            self.manage_fatigue()
         self.prep_for_next_quarter()
 
     def jump_ball(self):
@@ -1789,20 +1885,26 @@ class Game:
             )
             return
 
-    def add_fatigue(self):
-        for player in self.team1.active_players + self.team2.active_players:
+    def manage_fatigue(self):
+        # Check Team 1 Starters First
+        for player in self.team1.active_players:
             player.fatigue += 1
             if player.fatigue >= self.fatigue_limit:
                 print(
-                    f"{player.name} from {self.team1.name} is too fatigued and is substituted out!"
+                    f"{player.name} is looking like he's gassed, {self.team1.name} might wanna consider subbing him out"
                 )
-                self.team1.active_players.remove(player)
-                if self.team1.bench_players:
-                    substitute = self.team1.bench_players.pop(0)
-                    self.team1.active_players.append(substitute)
-                    print(
-                        f"{substitute.name} from {self.team1.name} is substituted in!"
-                    )
+            player.apply_fatigue()
+        # Check Team 2
+        for player in self.team2.active_players:
+            player.fatigue += 1
+            if player.fatigue >= self.fatigue_limit:
+                print(
+                    f"{player.name} is looking like he's gassed, {self.team2.name} might wanna consider subbing him out"
+                )
+            player.apply_fatigue()
+
+    def substitute_players(self):
+        pass
 
     def show_score(self):
         print(f"Current Score:{self.score}")
@@ -1843,12 +1945,35 @@ class Game:
             print(
                 f"\nQuarter {self.quarter} is about to start! Let's see some action!\n{self.show_score()}\n"
             )
-            self.choose_strategy(self.team1)  # Let the user choose a strategy
+            if self.team1.name == user.team_name:
+                self.in_game_menu(
+                    self.team1, self.team2
+                )  # Let the user choose a strategy
+            else:
+                self.in_game_menu(self.team1, self.team2)
             self.simulate_quarter()
             # Quarter end
-            print(
-                f"\nThat's the end of quarter {self.quarter}. The players are taking a breather.\n{self.show_score()}\n"
-            )
+            self.show_score()
+
+            if self.quarter != 4:
+                print(
+                    f"\nThat's the end of quarter {self.quarter}. The players are taking a breather.\n{self.show_score()}\n"
+                )
+            else:
+                print(f"\nThat's the End of the Game Regulation.\n{self.show_score()}")
+                while self.score[self.team1.name] == self.score[self.team2.name]:
+                    print(
+                        f"\nWe're tied at {self.score[self.team.name]}, We're going to overtime\n"
+                    )
+                    if self.team1.name == user.team_name:
+                        self.in_game_menu(
+                            self.team1, self.team2
+                        )  # Let the user choose a strategy
+                    else:
+                        self.in_game_menu(self.team1, self.team2)
+                    self.quarter == 5
+                    self.simulate_quarter()
+                    print(f"\nThat's the end of Overtime\n{self.show_score()}")
 
             self.print_team_stats()
 
@@ -1871,27 +1996,28 @@ class Game:
             self.show_score()
 
         time.sleep(1)  # pause for a second between quarters
+
+        if self.quarter != 4:
+            print(
+                f"\nThat's the end of quarter {self.quarter}. The players are taking a breather.\n\n"
+            )
+            self.show_score()
+        else:
+            print(f"\nThat's the End of the Game Regulation.\n")
+            self.show_score()
+            while self.score[self.team1.name] == self.score[self.team2.name]:
+                print(
+                    f"\nWe're tied at {self.score[self.team1.name]}, We're going to overtime\n"
+                )
+                self.quarter == 5
+                print(f"\nSimulating OverTime\n")
+                self.simulate_quarter()
+                print(f"\nThat's the end of Overtime\n")
+                self.show_score()
+
         self.print_result()
         self.post_game()
         self.flush_stats()
-
-    def substitute_players(self):
-        for team in [self.team1, self.team2]:
-            for player in team.active_players:
-                if (
-                    player.fouls >= self.foul_limit
-                    or player.fatigue >= self.fatigue_limit
-                ):
-                    if team.bench_players:  # If there are players on the bench
-                        # Substitute player with the first player on the bench
-                        bench_player = team.bench_players.pop(0)
-                        team.active_players.remove(player)
-                        team.active_players.append(bench_player)
-                        # Move the substituted player to the bench
-                        team.bench_players.append(player)
-                        # Reset fatigue for the substituted player
-                        player.fatigue = 0
-                        player.recover_stats()  # Recover stats after resting
 
     def print_result(self):
         winner = max(self.score, key=self.score.get)
@@ -1997,7 +2123,7 @@ def new_game():
                 user_team = TEAM_NAMES[choice - 1]
                 print(f"\n\nYou picked the {user_team}\n\n")
                 # Save User's Team
-                user.team = user_team
+                user.team_name = user_team
                 league.teams = league.create_teams()
                 league.schedule = league.create_schedule()
                 menu()
@@ -2015,7 +2141,7 @@ def get_team_by_name(team_name):
 
 def menu():
     print("Loading Game Menu...")
-    user_team = user.team
+    user_team = user.team_name
     date = create_date(league.month, league.day, league.current_year)
     while True:
         print(f"\nWorld Basketball League {league.current_year} - {date}")
@@ -2053,24 +2179,22 @@ def menu():
                     f"  Checking game {i+1}: {schedule[today][i][0].name} vs {schedule[today][i][1].name}"
                 )"""
                 if (
-                    user.team == schedule[today][i][0].name
-                    or user.team == schedule[today][i][1].name
+                    user.team_name == schedule[today][i][0].name
+                    or user.team_name == schedule[today][i][1].name
                 ):
                     # print(f"  User's team found in game {i+1}")
                     user_game = schedule[today].pop(i)
                     break
 
             if user_game:
-                print("User's game found:")
-                print(user_game)
+                debug_print("User's game found:")
+                debug_print(user_game)
             else:
-                print("User's game not found.")
+                debug_print("User's game not found.")
 
             # Quick simulate the rest of the games
-            debug_print("Temporary simulate_game to see problem")
             for match in schedule[today]:
                 game = Game(match[0], match[1], True)
-                # game.quick_simulate()
                 game.quick_simulate()
 
             # Simulate the user's game
@@ -2086,7 +2210,7 @@ def menu():
 
         elif choice == "2":
             # logging.info the user team's roster
-            print_team_roster(get_team_by_name(user.team))
+            print_team_roster(get_team_by_name(user.team_name))
 
         elif choice == "3":
             # Show stats for players in the selected team
